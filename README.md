@@ -13,7 +13,7 @@ By using Citus, you extend your PostgreSQL database with several new superpowers
 - **Distributed tables** are sharded across a cluster of PostgreSQL servers to combine their CPU, memory, storage and I/O capacity.
 - **References tables** are replicated to all servers for joins and foreign keys from distributed tables and maximum read performance.
 - **Parallel, distributed query engine** parallelizes SELECT, DML, and other operations on distributed tables across the cluster.
-- **Columnar storage** compresses data, speeds up scans, and supports fast projections, both locally and distributed.
+- **Columnar storage** compresses data, speeds up scans, and supports fast projections, both on regular and distributed tables.
 
 Because Citus is an extension, you can always use it with the latest Postgres version. That means that you can avoid a costly migration and you can keep using the Postgres tools and extensions that you are already familiar with.
 
@@ -61,7 +61,7 @@ CREATE TABLE events (user_id int, event_id bigserial, event_time timestamptz def
 SELECT create_distributed_table('events', 'user_id');
 ```
 
-After this operations, queries for a specific user ID will be efficiently routed to a single worker node, while queries across user IDs will be parallelized across the cluster.
+After this operation, queries for a specific user ID will be efficiently routed to a single worker node, while queries across user IDs will be parallelized across the cluster.
 
 ### Usage example: Columnar storage
 
@@ -71,7 +71,7 @@ To use columnar storage, all you need to do is add `USING columnar` to your `CRE
 CREATE TABLE events (event_id bigserial, event_time timestamptz default now(), data jsonb not null) USING columnar; 
 ```
 
-When using columnar storage, you should only load data in batch using `COPY` or `INSERT..SELECT` to achieve good  compression. Update, delete and indexes are currently unsupported on the columnar storage.
+When using columnar storage, you should only load data in batch using `COPY` or `INSERT..SELECT` to achieve good  compression. Update, delete and indexes are currently unsupported on columnar tables.
 
 You can use columnar storage by itself, or in a distributed table to combine the benefits of compression and distributed query parallelism.
 
