@@ -21,22 +21,22 @@ Because Citus is an extension, you can always use it with the latest Postgres ve
 
 Citus is uniquely capable of scaling both analytical and transactional workloads with up to petabytes of data. There are several use cases in which Citus is the state-of-the-art solution and most commonly used:
 
-- **[Customer-facing analytics dashboards](http://docs.citusdata.com/en/latest/use_cases/realtime_analytics.html)**
+- **[Customer-facing analytics dashboards](http://docs.citusdata.com/en/latest/use_cases/realtime_analytics.html)**:
   Citus enables you to build analytics dashboard that simultaneously ingest and process large amounts of data in the database and give subsecond response times even with a large number of concurrent users.
   
   The advanced parallel, distributed query engine in Citus combined with PostgreSQL features such as [array types](https://www.postgresql.org/docs/current/arrays.html), [JSONB](https://www.postgresql.org/docs/current/datatype-json.html), [lateral joins](https://heap.io/blog/engineering/postgresqls-powerful-new-join-type-lateral), and extensions like [HyperLogLog](https://github.com/citusdata/postgresql-hll) and [TopN](https://github.com/citusdata/postgresql-topn) allow you to build responsive analytics dashboards no matter how many customers or how much data you have.
 
   Example users: [Algolia](https://www.citusdata.com/customers/algolia), [Heap](https://www.citusdata.com/customers/heap)
   
-- **[Time series data](http://docs.citusdata.com/en/latest/use_cases/timeseries.html)**
-  Citus integrates seamlessly with [Postgres table partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html) and [pg_partman](https://www.citusdata.com/blog/2018/01/24/citus-and-pg-partman-creating-a-scalable-time-series-database-on-PostgreSQL/) to handle analytics on very large amounts of time series data.
+- **[Time series data](http://docs.citusdata.com/en/latest/use_cases/timeseries.html)**:
+  Citus enables you to process and analyze very large amounts of time series data. The biggest Citus clusters store well over a petabyte of time series data and ingest terabytes per day.
   
-  Distributing your Postgres tables using Citus allows you to handle any amount of data, while time-partitioning allows you to efficiently query time ranges, and maintain high write performance even as your data grows. Using built-in *columnar storage*, you can compress old data to speed up scans and save on storage.
+  Citus integrates seamlessly with [Postgres table partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html) and [pg_partman](https://www.citusdata.com/blog/2018/01/24/citus-and-pg-partman-creating-a-scalable-time-series-database-on-PostgreSQL/), which can speed up queries and writes on time series tables. You can take advantage of the parallel, distributed query engine for fast analytical queries, and use the built-in *columnar storage* to compress old partitions.
   
   Example users: [MixRank](https://www.citusdata.com/customers/mixrank), [Windows team](https://techcommunity.microsoft.com/t5/azure-database-for-postgresql/architecting-petabyte-scale-analytics-by-scaling-out-postgres-on/ba-p/969685)
 
-- **[Software-as-a-service (SaaS) applications](http://docs.citusdata.com/en/latest/use_cases/multi_tenant.html)**
-  SaaS and other multi-tenant applications need to be able to scale their database as the number of tenants/customers grows. Citus enables you to tranpsarently shard a complex, data model by the tenant dimension such to enable your database to grow along with your business.
+- **[Software-as-a-service (SaaS) applications](http://docs.citusdata.com/en/latest/use_cases/multi_tenant.html)**:
+  SaaS and other multi-tenant applications need to be able to scale their database as the number of tenants/customers grows. Citus enables you to transparently shard a complex, data model by the tenant dimension such to enable your database to grow along with your business.
   
   By distributing tables along a tenant ID column and co-locating data for the same tenant, Citus can horizontally scale complex (tenant-scoped) queries, transactions, and foreign key graphs. Reference tables and distributed DDL commands make database management a breeze compared to manual sharding. On top of that, you have a built-in distributed query engine for doing cross-tenant analytics inside the database.
   
