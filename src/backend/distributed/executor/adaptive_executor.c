@@ -2299,7 +2299,16 @@ RunDistributedExecution(DistributedExecution *execution)
 				ManageWorkerPool(workerPool);
 			}
 
-			if (execution->rebuildWaitEventSet)
+
+			if (execution->remoteTaskList == NIL)
+			{
+				/*
+				 * All the tasks are failed over to the local execution, no need
+				 * to wait for any connection activity.
+				 */
+				continue;
+			}
+			else if (execution->rebuildWaitEventSet)
 			{
 				if (events != NULL)
 				{
