@@ -1060,7 +1060,7 @@ CoordinatedRemoteTransactionsSavepointRollback(SubTransactionId subId)
 
 		if (transaction->transactionFailed)
 		{
-			if (transaction->lastSuccessfulSubXact <= subId)
+			if (true || transaction->lastSuccessfulSubXact <= subId)
 			{
 				transaction->transactionRecovering = true;
 
