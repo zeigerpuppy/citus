@@ -333,6 +333,14 @@ extern List * CitusLocalTableTriggerCommandDDLJob(Oid relationId, char *triggerN
 												  const char *queryString);
 extern Oid GetTriggerFunctionId(Oid triggerId);
 
+/* create_table_utils.c */
+
+typedef void (*ConvertTableFunc)(Oid, bool);
+
+extern void CreateTableCascade(Oid relationId, LOCKMODE relLockMode, ConvertTableFunc convertTableFunc);
+extern void ExecuteAndLogDDLCommandList(List *ddlCommandList);
+extern void ExecuteAndLogDDLCommand(const char *commandString);
+
 extern bool ShouldPropagateSetCommand(VariableSetStmt *setStmt);
 extern void PostprocessVariableSetStmt(VariableSetStmt *setStmt, const char *setCommand);
 
