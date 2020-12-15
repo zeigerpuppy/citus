@@ -49,6 +49,7 @@ static void ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable(
 static List * GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command);
 static bool AlterTableCommandTypeIsTrigger(AlterTableType alterTableType);
+static bool AlterTableHasAddDropForeignKey(AlterTableStmt *alterTableStatement);
 static void ErrorIfUnsupportedAlterTableStmt(AlterTableStmt *alterTableStatement);
 static void ErrorIfCitusLocalTablePartitionCommand(AlterTableCmd *alterTableCmd,
 												   Oid parentRelationId);
@@ -100,8 +101,8 @@ PreprocessDropTableStmt(Node *node, const char *queryString)
 
 		Oid relationId = RangeVarGetRelid(tableRangeVar, AccessShareLock, missingOK);
 
-		/* we're not interested in non-valid, non-distributed relations */
-		if (relationId == InvalidOid || !IsCitusTable(relationId))
+		/* we're not interested in non-valid relations */
+		if (relationId == InvalidOid)
 		{
 			continue;
 		}
@@ -117,6 +118,12 @@ PreprocessDropTableStmt(Node *node, const char *queryString)
 		if ((TableReferenced(relationId) || TableReferencing(relationId)))
 		{
 			MarkInvalidateForeignKeyGraph();
+		}
+
+		/* we're not interested in non-distributed relations */
+		if (!IsCitusTable(relationId))
+		{
+			continue;
 		}
 
 		/* we're only interested in partitioned and mx tables */
@@ -180,6 +187,12 @@ PostprocessCreateTableStmt(CreateStmt *createStatement, const char *queryString)
 	if (HasForeignKeyToCitusLocalTable(relationId))
 	{
 		ErrorOutForFKeyBetweenPostgresAndCitusLocalTable(relationId);
+	}
+
+	/* invalidate foreign key cache if the table involved in any foreign key */
+	if ((TableReferenced(relationId) || TableReferencing(relationId)))
+	{
+		MarkInvalidateForeignKeyGraph();
 	}
 #endif
 
@@ -383,6 +396,11 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 	 * tables to citus local tables here.
 	 */
 	ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable(alterTableStatement);
+
+	if (AlterTableHasAddDropForeignKey(alterTableStatement))
+	{
+		MarkInvalidateForeignKeyGraph();
+	}
 
 	bool referencingIsLocalTable = !IsCitusTable(leftRelationId);
 	if (referencingIsLocalTable)
@@ -933,17 +951,6 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 			Assert(list_length(commandList) == 1);
 
 			ErrorIfUnsupportedAlterAddConstraintStmt(alterTableStatement);
-
-			if (!OidIsValid(relationId))
-			{
-				continue;
-			}
-
-			Constraint *constraint = (Constraint *) command->def;
-			if (constraint->contype == CONSTR_FOREIGN)
-			{
-				InvalidateForeignKeyGraph();
-			}
 		}
 		else if (alterTableType == AT_AddColumn)
 		{
@@ -974,6 +981,60 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 			}
 		}
 	}
+}
+
+
+static bool
+AlterTableHasAddDropForeignKey(AlterTableStmt *alterTableStatement)
+{
+	LOCKMODE lockmode = AlterTableGetLockLevel(alterTableStatement->cmds);
+	Oid relationId = AlterTableLookupRelation(alterTableStatement, lockmode);
+
+	List *commandList = alterTableStatement->cmds;
+	AlterTableCmd *command = NULL;
+	foreach_ptr(command, commandList)
+	{
+		AlterTableType alterTableType = command->subtype;
+
+		if (alterTableType == AT_AddConstraint)
+		{
+			if (!OidIsValid(relationId))
+			{
+				continue;
+			}
+
+			Constraint *constraint = (Constraint *) command->def;
+			if (constraint->contype == CONSTR_FOREIGN)
+			{
+				return true;
+			}
+		}
+		else if (alterTableType == AT_DropConstraint)
+		{
+			if (!OidIsValid(relationId))
+			{
+				continue;
+			}
+
+			/*
+			 * don't check if a fkey constraint, we might be dropping a uniqueness
+			 * constraint that a fkey references.
+			 * TODO: fix this on master in a better way
+			 */
+			return true;
+		}
+		else if (alterTableType == AT_DropColumn)
+		{
+			if (!OidIsValid(relationId))
+			{
+				continue;
+			}
+
+			return true;
+		}
+	}
+
+	return false;
 }
 
 
@@ -1344,11 +1405,6 @@ ErrorIfUnsupportedAlterTableStmt(AlterTableStmt *alterTableStatement)
 				if (!OidIsValid(relationId))
 				{
 					return;
-				}
-
-				if (ConstraintIsAForeignKey(command->name, relationId))
-				{
-					MarkInvalidateForeignKeyGraph();
 				}
 
 				break;
