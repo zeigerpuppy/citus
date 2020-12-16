@@ -33,6 +33,7 @@
 #include "distributed/relation_access_tracking.h"
 #include "distributed/resource_lock.h"
 #include "distributed/version_compat.h"
+#include "distributed/worker_protocol.h"
 #include "lib/stringinfo.h"
 #include "nodes/parsenodes.h"
 #include "storage/lmgr.h"
@@ -44,8 +45,10 @@
 /* Local functions forward declarations for unsupported command checks */
 static void PostprocessCreateTableStmtPartitionOf(CreateStmt *createStatement,
 												  const char *queryString);
-static void ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable(
+static bool AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	AlterTableStmt *alterTableStatement);
+static void ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement);
+static List * GetAlterTableAddFKeyRelations(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command);
 static bool AlterTableCommandTypeIsTrigger(AlterTableType alterTableType);
@@ -388,14 +391,30 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 		leftRelationId = IndexGetRelation(leftRelationId, missingOk);
 	}
 
-	/*
-	 * Normally, we would do this check in ErrorIfUnsupportedForeignConstraintExists
-	 * in post process step. However, we skip doing error checks in post process if
-	 * this pre process returns NIL -and this method returns NIL if the left relation
-	 * is a postgres table. So, we need to error out for foreign keys from postgres
-	 * tables to citus local tables here.
-	 */
-	ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable(alterTableStatement);
+	if (AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(alterTableStatement))
+	{
+		/*
+		 * To support foreign keys from/to postgres local tables to/from reference
+		 * or citus local tables, we convert given postgres local table -and the
+		 * other postgres local tables that it is connected via a fkey graph- to a
+		 * citus local table.
+		 */
+		ConvertPostgresLocalTablesToCitusLocalTables(alterTableStatement);
+
+		/*
+		 * CreateCitusLocalTable converts relation to a shard relation and creates
+		 * shell table from scratch, so we need to parse utility command parse tree
+		 * again.
+		 *
+		 * For this reason we should re-enter to PreprocessAlterTableStmt to acquire
+		 * necessary locks. We should also modify parse tree passed to this function
+		 * so that standard_ProcessUtility & Postprocess methods process the correct
+		 * relation.
+		 */
+		Node *newParseTree = ParseTreeNode(alterTableCommand);
+		*node = *newParseTree;
+		return PreprocessAlterTableStmt(node, alterTableCommand);
+	}
 
 	if (AlterTableHasAddDropForeignKey(alterTableStatement))
 	{
@@ -607,25 +626,75 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 }
 
 
-/*
- * ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable errors out if
- * given ALTER TABLE statement defines foreign key from a postgres local table
- * to a citus local table.
- */
-static void
-ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable(
+static bool
+AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	AlterTableStmt *alterTableStatement)
+{
+	bool hasPostgresLocalTable = false;
+	bool hasCitusLocalTable = false;
+	bool hasReferenceTable = false;
+
+	Oid atFKeyRelationId = InvalidOid;
+	List *atFKeyRelationIdList = GetAlterTableAddFKeyRelations(alterTableStatement);
+	foreach_oid(atFKeyRelationId, atFKeyRelationIdList)
+	{
+		if (!IsCitusTable(atFKeyRelationId))
+		{
+			hasPostgresLocalTable = true;
+		}
+		else if (IsCitusTableType(atFKeyRelationId, CITUS_LOCAL_TABLE))
+		{
+			hasCitusLocalTable = true;
+		}
+		else if (IsCitusTableType(atFKeyRelationId, REFERENCE_TABLE))
+		{
+			hasReferenceTable = true;
+		}
+	}
+
+	return (hasCitusLocalTable || hasReferenceTable) && hasPostgresLocalTable;
+}
+
+
+static void
+ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement)
+{
+	List *atFKeyRelationIdList = GetAlterTableAddFKeyRelations(alterTableStatement);
+
+	/* sort the list before converting each postgres local table to a citus local table */
+	atFKeyRelationIdList = SortList(atFKeyRelationIdList, CompareOids);
+
+	Oid atFKeyRelationId = InvalidOid;
+	foreach_oid(atFKeyRelationId, atFKeyRelationIdList)
+	{
+		if (IsCitusTable(atFKeyRelationId))
+		{
+			/*
+			 * atFKeyRelationIdList has also reference and citus local tables
+			 * involved in this ADD FOREIGN KEY command. Morever, even if
+			 * atFKeyRelationId was belonging to a postgres  local table initially,
+			 * we might had already converted it to a citus local table by cascading.
+			 */
+			continue;
+		}
+
+		/* TODO: should use try/catch block for CreateCitusLocalTable function */
+		bool cascade = true;
+		CreateCitusLocalTable(atFKeyRelationId, cascade);
+	}
+}
+
+
+static List *
+GetAlterTableAddFKeyRelations(AlterTableStmt *alterTableStatement)
 {
 	List *commandList = alterTableStatement->cmds;
 
 	LOCKMODE lockmode = AlterTableGetLockLevel(commandList);
 	Oid leftRelationId = AlterTableLookupRelation(alterTableStatement, lockmode);
 
-	if (IsCitusTable(leftRelationId))
-	{
-		/* left relation is not a postgres local table, */
-		return;
-	}
+	/* add left relation */
+	List *atFKeyRelationIdList = list_make1_oid(leftRelationId);
 
 	List *alterTableFKeyConstraints =
 		GetAlterTableStmtFKeyConstraintList(alterTableStatement);
@@ -634,11 +703,10 @@ ErrorIfAlterTableDefinesFKeyFromPostgresToCitusLocalTable(
 	{
 		Oid rightRelationId = RangeVarGetRelid(constraint->pktable, lockmode,
 											   alterTableStatement->missing_ok);
-		if (IsCitusTableType(rightRelationId, CITUS_LOCAL_TABLE))
-		{
-			ErrorOutForFKeyBetweenPostgresAndCitusLocalTable(leftRelationId);
-		}
+		atFKeyRelationIdList = lappend_oid(atFKeyRelationIdList, rightRelationId);
 	}
+
+	return atFKeyRelationIdList;
 }
 
 
