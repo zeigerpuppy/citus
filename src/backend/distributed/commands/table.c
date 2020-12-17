@@ -51,6 +51,7 @@ static void ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTa
 static List * GetAlterTableAddFKeyRelations(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command);
+static List * GetConstraintListRelations(List *constraintList, LOCKMODE lockmode, bool missingOk);
 static bool AlterTableCommandTypeIsTrigger(AlterTableType alterTableType);
 static bool AlterTableHasAddDropForeignKey(AlterTableStmt *alterTableStatement);
 static void ErrorIfUnsupportedAlterTableStmt(AlterTableStmt *alterTableStatement);
@@ -693,20 +694,16 @@ GetAlterTableAddFKeyRelations(AlterTableStmt *alterTableStatement)
 	LOCKMODE lockmode = AlterTableGetLockLevel(commandList);
 	Oid leftRelationId = AlterTableLookupRelation(alterTableStatement, lockmode);
 
-	/* add left relation */
-	List *atFKeyRelationIdList = list_make1_oid(leftRelationId);
-
 	List *alterTableFKeyConstraints =
 		GetAlterTableStmtFKeyConstraintList(alterTableStatement);
-	Constraint *constraint = NULL;
-	foreach_ptr(constraint, alterTableFKeyConstraints)
-	{
-		Oid rightRelationId = RangeVarGetRelid(constraint->pktable, lockmode,
-											   alterTableStatement->missing_ok);
-		atFKeyRelationIdList = lappend_oid(atFKeyRelationIdList, rightRelationId);
-	}
 
-	return atFKeyRelationIdList;
+	/* add right relations */
+	List *constraintListRelations = GetConstraintListRelations(alterTableFKeyConstraints, lockmode,
+																alterTableStatement->missing_ok);
+	/* add left relation */
+	constraintListRelations = lappend_oid(constraintListRelations, leftRelationId);
+
+	return constraintListRelations;
 }
 
 
@@ -770,6 +767,22 @@ GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command)
 	}
 
 	return fkeyConstraintList;
+}
+
+
+static List *
+GetConstraintListRelations(List *constraintList, LOCKMODE lockmode, bool missingOk)
+{
+	List *constraintListRelations = NIL;
+
+	Constraint *constraint = NULL;
+	foreach_ptr(constraint, constraintList)
+	{
+		Oid rightRelationId = RangeVarGetRelid(constraint->pktable, lockmode, missingOk);
+		constraintListRelations = lappend_oid(constraintListRelations, rightRelationId);
+	}
+
+	return constraintListRelations;
 }
 
 
