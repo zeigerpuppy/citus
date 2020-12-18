@@ -339,6 +339,7 @@ extern Oid GetTriggerFunctionId(Oid triggerId);
 typedef void (*ConvertTableFunc)(Oid, bool);
 
 extern void CreateTableCascade(Oid relationId, LOCKMODE relLockMode, ConvertTableFunc convertTableFunc);
+extern List * GetRelationDropFKeyCommandsForFKeyIdList(Oid relationId, List *relFkeyIds);
 extern void ExecuteAndLogDDLCommandList(List *ddlCommandList);
 extern void ExecuteAndLogDDLCommand(const char *commandString);
 

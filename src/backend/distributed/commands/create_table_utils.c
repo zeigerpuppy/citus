@@ -86,10 +86,17 @@ DropRelationFKeys(Oid relationId)
 static List *
 GetRelationDropFkeyCommands(Oid relationId)
 {
+	List *relFkeyIds = GetForeignKeyOids(relationId, INCLUDE_REFERENCING_CONSTRAINTS);
+	return GetRelationDropFKeyCommandsForFKeyIdList(relationId, relFkeyIds);
+}
+
+
+List *
+GetRelationDropFKeyCommandsForFKeyIdList(Oid relationId, List *relFkeyIds)
+{
 	List *commands = NIL;
 
 	Oid fkeyId;
-	List *relFkeyIds = GetForeignKeyOids(relationId, INCLUDE_REFERENCING_CONSTRAINTS);
 	foreach_oid(fkeyId, relFkeyIds)
 	{
 		char *command = GetRelationFkeyCascadeDropCommand(relationId, fkeyId);
