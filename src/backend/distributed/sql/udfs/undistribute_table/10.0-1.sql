@@ -1,3 +1,4 @@
+DROP FUNCTION pg_catalog.undistribute_table(regclass);
 CREATE OR REPLACE FUNCTION pg_catalog.undistribute_table(
     table_name regclass, cascade boolean default false)
     RETURNS VOID
