@@ -68,8 +68,6 @@ static List * GetForeignConstraintCommandsInternal(Oid relationId, int flags);
 static Oid get_relation_constraint_oid_compat(HeapTuple heapTuple);
 static List * GetForeignKeyOidsToCitusLocalTables(Oid relationId);
 static List * GetForeignKeyOidsToReferenceTables(Oid relationId);
-static List * FilterFKeyOidListByReferencedTableType(List *foreignKeyOidList,
-													 CitusTableType citusTableType);
 
 /*
  * ConstraintIsAForeignKeyToReferenceTable checks if the given constraint is a
@@ -582,12 +580,18 @@ GetForeignConstraintCommandsInternal(Oid relationId, int flags)
 {
 	List *foreignKeyOids = GetForeignKeyOids(relationId, flags);
 
+	return GetForeignConstraintCommandsForFKeyIdList(foreignKeyOids);
+}
+
+List *
+GetForeignConstraintCommandsForFKeyIdList(List *fkeyIdList)
+{
 	List *foreignKeyCommands = NIL;
 
 	PushOverrideEmptySearchPath(CurrentMemoryContext);
 
 	Oid foreignKeyOid = InvalidOid;
-	foreach_oid(foreignKeyOid, foreignKeyOids)
+	foreach_oid(foreignKeyOid, fkeyIdList)
 	{
 		char *statementDef = pg_get_constraintdef_command(foreignKeyOid);
 
@@ -687,7 +691,7 @@ GetForeignKeyOidsToReferenceTables(Oid relationId)
  * CitusTableType to filter the foreign key OIDs that CitusTableType matches
  * referenced relation's type.
  */
-static List *
+List *
 FilterFKeyOidListByReferencedTableType(List *foreignKeyOidList,
 									   CitusTableType citusTableType)
 {

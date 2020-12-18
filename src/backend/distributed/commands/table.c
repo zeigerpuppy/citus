@@ -43,10 +43,12 @@
 
 
 /* Local functions forward declarations for unsupported command checks */
+static void ProcessFKeysForTableCreation(RangeVar *relation);
 static void PostprocessCreateTableStmtPartitionOf(CreateStmt *createStatement,
 												  const char *queryString);
 static bool AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	AlterTableStmt *alterTableStatement);
+static bool IsCreateTableCommandString(const char *command);
 static void ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement);
 static int CompareRangeVarsByOid(const void *leftElement, const void *rightElement);
 static List * GetAlterTableAddFKeyRelationIds(AlterTableStmt *alterTableStatement);
@@ -175,39 +177,60 @@ void
 PostprocessCreateTableStmt(CreateStmt *createStatement, const char *queryString)
 {
 #if PG_VERSION_NUM < PG_VERSION_13
-
-	/*
-	 * Postgres processes foreign key constraints implied by CREATE TABLE
-	 * commands by internally executing ALTER TABLE commands via standard
-	 * process utility starting from PG13. Hence, we will already perform
-	 * unsupported foreign key checks via PreprocessAlterTableStmt function
-	 * in PG13. But for the older version, we need to do unsupported foreign
-	 * key checks here.
-	 */
-
-	/*
-	 * Relation must exist and it is already locked as standard process utility
-	 * is already executed.
-	 */
-	bool missingOk = false;
-	Oid relationId = RangeVarGetRelid(createStatement->relation, NoLock, missingOk);
-	if (HasForeignKeyToCitusLocalTable(relationId))
-	{
-		ErrorOutForFKeyBetweenPostgresAndCitusLocalTable(relationId);
-	}
-
-	/* invalidate foreign key cache if the table involved in any foreign key */
-	if ((TableReferenced(relationId) || TableReferencing(relationId)))
-	{
-		MarkInvalidateForeignKeyGraph();
-	}
+	ProcessFKeysForTableCreation(createStatement->relation);
 #endif
 
+	/* TODO: question, foreign keys or attach partitions commands are more impoortant ? */
 	if (createStatement->inhRelations != NIL && createStatement->partbound != NULL)
 	{
 		/* process CREATE TABLE ... PARTITION OF command */
 		PostprocessCreateTableStmtPartitionOf(createStatement, queryString);
 	}
+}
+
+
+static void
+ProcessFKeysForTableCreation(RangeVar *relation)
+{
+	/*
+	 * Relation must exist and it is already locked as standard process utility
+	 * is already executed.
+	 */
+	bool missingOk = false;
+	Oid relationId = RangeVarGetRelid(relation, NoLock, missingOk);
+
+	List *foreignKeyOidList = GetForeignKeyOids(relationId, INCLUDE_REFERENCING_CONSTRAINTS);
+
+	List *nonDistTableFkeys = FilterFKeyOidListByReferencedTableType(foreignKeyOidList, CITUS_TABLE_WITH_NO_DIST_KEY);
+	List *distTableFkeys = FilterFKeyOidListByReferencedTableType(foreignKeyOidList, DISTRIBUTED_TABLE);
+
+	bool hasFkeyToNonDistTable = list_length(nonDistTableFkeys) != 0;
+	bool hasFkeyToDistTable = list_length(distTableFkeys) != 0;
+
+	if (hasFkeyToDistTable)
+	{
+		/* TODO: fix this on master */
+		ereport(ERROR, (errmsg("Fkeys btw local & dist tables are not supported")));
+	}
+
+	if (!hasFkeyToNonDistTable)
+	{
+		bool hasFkeyToPostgresTable = list_length(foreignKeyOidList) - (list_length(nonDistTableFkeys) + list_length(distTableFkeys));
+		if (hasFkeyToPostgresTable)
+		{
+			MarkInvalidateForeignKeyGraph();
+		}
+		return;
+	}
+
+	List *dropToNonDistCommands = GetRelationDropFKeyCommandsForFKeyIdList(relationId, nonDistTableFkeys);
+	List *createToNonDistCommands = GetForeignConstraintCommandsForFKeyIdList(nonDistTableFkeys);
+
+	/* drop and re-define foreign keys so that alter table hook does the necessary job */
+	ExecuteAndLogDDLCommandList(dropToNonDistCommands);
+	ExecuteAndLogDDLCommandList(createToNonDistCommands);
+
+	/* no need to mark fkey graph as invalid as alter table would do that */
 }
 
 
@@ -247,6 +270,21 @@ PostprocessCreateTableStmtPartitionOf(CreateStmt *createStatement, const
 							   parentDistributionMethod, parentRelationName,
 							   viaDeprecatedAPI);
 	}
+}
+
+
+void
+PostprocessAlterLocalTable(AlterTableStmt *alterTableStatement, const char *queryString)
+{
+#if PG_VERSION_NUM >= PG_VERSION_13
+	if (!IsCreateTableCommandString(queryString))
+	{
+		/* we only process alter table commands that postgres populated from create table command */
+		return;
+	}
+
+	ProcessFKeysForTableCreation(alterTableStatement->relation);
+#endif
 }
 
 
@@ -395,7 +433,11 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 		leftRelationId = IndexGetRelation(leftRelationId, missingOk);
 	}
 
-	if (AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(alterTableStatement))
+	if (AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(alterTableStatement)
+#if PG_VERSION_NUM >= PG_VERSION_13
+	    && !IsCreateTableCommandString(alterTableCommand)
+#endif
+		)
 	{
 		/*
 		 * To support foreign keys from/to postgres local tables to/from reference
@@ -653,6 +695,14 @@ AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	return (hasCitusLocalTable || hasReferenceTable) && hasPostgresLocalTable;
 }
 
+#if PG_VERSION_NUM >= PG_VERSION_13
+static bool
+IsCreateTableCommandString(const char *command)
+{
+	Node *node = ParseTreeNode(command);
+	return IsA(node, CreateStmt);
+}
+#endif
 
 
 static void

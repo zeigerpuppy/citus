@@ -562,6 +562,12 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 	{
 		AlterTableStmt *alterTableStatement = (AlterTableStmt *) parsetree;
 
+		/*
+		 * PreprocessAlterTableStmt return NIL for local table so we don't
+		 * execute PostprocessAlterTableStmt, so we need to intercept here
+		 */
+		/* TODO: which one has more priority ? */
+		PostprocessAlterLocalTable(alterTableStatement, queryString);
 		PostprocessAlterTableStmtAttachPartition(alterTableStatement, queryString);
 	}
 

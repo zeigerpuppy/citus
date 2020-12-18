@@ -15,6 +15,7 @@
 
 #include "postgres.h"
 
+#include "distributed/metadata_cache.h"
 #include "utils/rel.h"
 #include "nodes/parsenodes.h"
 #include "tcop/dest.h"
@@ -125,8 +126,10 @@ extern void ErrorOutForFKeyBetweenPostgresAndCitusLocalTable(Oid localTableId);
 extern bool ColumnAppearsInForeignKeyToReferenceTable(char *columnName, Oid
 													  relationId);
 extern List * GetReferencingForeignConstaintCommands(Oid relationOid);
+extern List * GetForeignConstraintCommandsForFKeyIdList(List *fkeyIdList);
 extern bool HasForeignKeyToCitusLocalTable(Oid relationId);
 extern bool HasForeignKeyToReferenceTable(Oid relationOid);
+extern List * FilterFKeyOidListByReferencedTableType(List *foreignKeyOidList, CitusTableType citusTableType);
 extern bool TableReferenced(Oid relationOid);
 extern bool TableReferencing(Oid relationOid);
 extern bool ConstraintIsAForeignKey(char *inputConstaintName, Oid relationOid);
@@ -248,6 +251,7 @@ extern Node * ProcessCreateSubscriptionStmt(CreateSubscriptionStmt *createSubStm
 extern List * PreprocessDropTableStmt(Node *stmt, const char *queryString);
 extern void PostprocessCreateTableStmt(CreateStmt *createStatement,
 									   const char *queryString);
+extern void PostprocessAlterLocalTable(AlterTableStmt *alterTableStatement, const char *queryString);
 extern List * PostprocessAlterTableStmtAttachPartition(
 	AlterTableStmt *alterTableStatement,
 	const char *queryString);
