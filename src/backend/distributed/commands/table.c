@@ -48,7 +48,9 @@ static void PostprocessCreateTableStmtPartitionOf(CreateStmt *createStatement,
 												  const char *queryString);
 static bool AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	AlterTableStmt *alterTableStatement);
+#if PG_VERSION_NUM >= PG_VERSION_13
 static bool IsCreateTableCommandString(const char *command);
+#endif
 static void ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement);
 static int CompareRangeVarsByOid(const void *leftElement, const void *rightElement);
 static List * GetAlterTableAddFKeyRelationIds(AlterTableStmt *alterTableStatement);
