@@ -48,10 +48,13 @@ static void PostprocessCreateTableStmtPartitionOf(CreateStmt *createStatement,
 static bool AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	AlterTableStmt *alterTableStatement);
 static void ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement);
-static List * GetAlterTableAddFKeyRelations(AlterTableStmt *alterTableStatement);
+static int CompareRangeVarsByOid(const void *leftElement, const void *rightElement);
+static List * GetAlterTableAddFKeyRelationIds(AlterTableStmt *alterTableStatement);
+static List * GetAlterTableAddFKeyRelationRangeVars(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command);
-static List * GetConstraintListRelations(List *constraintList, LOCKMODE lockmode, bool missingOk);
+static List * GetConstraintListRelationRangeVars(List *constraintList);
+static List * GetRelationIdsFromRangeVarList(List *rangeVarList, LOCKMODE lockmode, bool missingOk);
 static bool AlterTableCommandTypeIsTrigger(AlterTableType alterTableType);
 static bool AlterTableHasAddDropForeignKey(AlterTableStmt *alterTableStatement);
 static void ErrorIfUnsupportedAlterTableStmt(AlterTableStmt *alterTableStatement);
@@ -404,16 +407,10 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 
 		/*
 		 * CreateCitusLocalTable converts relation to a shard relation and creates
-		 * shell table from scratch, so we need to parse utility command parse tree
-		 * again.
-		 *
+		 * shell table from scratch.
 		 * For this reason we should re-enter to PreprocessAlterTableStmt to acquire
-		 * necessary locks. We should also modify parse tree passed to this function
-		 * so that standard_ProcessUtility & Postprocess methods process the correct
-		 * relation.
+		 * necessary locks.
 		 */
-		Node *newParseTree = ParseTreeNode(alterTableCommand);
-		*node = *newParseTree;
 		return PreprocessAlterTableStmt(node, alterTableCommand);
 	}
 
@@ -636,7 +633,7 @@ AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	bool hasReferenceTable = false;
 
 	Oid atFKeyRelationId = InvalidOid;
-	List *atFKeyRelationIdList = GetAlterTableAddFKeyRelations(alterTableStatement);
+	List *atFKeyRelationIdList = GetAlterTableAddFKeyRelationIds(alterTableStatement);
 	foreach_oid(atFKeyRelationId, atFKeyRelationIdList)
 	{
 		if (!IsCitusTable(atFKeyRelationId))
@@ -657,21 +654,26 @@ AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 }
 
 
+
 static void
 ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement)
 {
-	List *atFKeyRelationIdList = GetAlterTableAddFKeyRelations(alterTableStatement);
+	List *atFKeyRelationRangeVars = GetAlterTableAddFKeyRelationRangeVars(alterTableStatement);
 
 	/* sort the list before converting each postgres local table to a citus local table */
-	atFKeyRelationIdList = SortList(atFKeyRelationIdList, CompareOids);
+	atFKeyRelationRangeVars = SortList(atFKeyRelationRangeVars, CompareRangeVarsByOid);
 
-	Oid atFKeyRelationId = InvalidOid;
-	foreach_oid(atFKeyRelationId, atFKeyRelationIdList)
+	/* here we should operate on rangeVars as we oid's of relations might change in loop due to CreateCitusLocalTable */
+	RangeVar *rangeVar;
+	foreach_ptr(rangeVar, atFKeyRelationRangeVars)
 	{
+		/* relation might already be converted to citus local table, to get rel id from range var again */
+		LOCKMODE lockmode = AlterTableGetLockLevel(alterTableStatement->cmds);
+		Oid atFKeyRelationId = RangeVarGetRelid(rangeVar, lockmode, false);
 		if (IsCitusTable(atFKeyRelationId))
 		{
 			/*
-			 * atFKeyRelationIdList has also reference and citus local tables
+			 * atFKeyRelationRangeVars has also reference and citus local tables
 			 * involved in this ADD FOREIGN KEY command. Morever, even if
 			 * atFKeyRelationId was belonging to a postgres  local table initially,
 			 * we might had already converted it to a citus local table by cascading.
@@ -686,24 +688,59 @@ ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement
 }
 
 
-static List *
-GetAlterTableAddFKeyRelations(AlterTableStmt *alterTableStatement)
+static int
+CompareRangeVarsByOid(const void *leftElement, const void *rightElement)
 {
-	List *commandList = alterTableStatement->cmds;
+	RangeVar *leftRangeVar = *((RangeVar **) leftElement);
+	RangeVar *rightRangeVar = *((RangeVar **) rightElement);
 
-	LOCKMODE lockmode = AlterTableGetLockLevel(commandList);
-	Oid leftRelationId = AlterTableLookupRelation(alterTableStatement, lockmode);
+	/*
+	 * Any way we will check their existence, so it's okay to consider
+	 * rangeVars mapped to InvalidOid when sorting.
+	 * Also we assume caller already locked relations.
+	 */
+	bool missingOk = true;
+	Oid leftRelationId = RangeVarGetRelid(leftRangeVar, NoLock, missingOk);
+	Oid rightRelationId = RangeVarGetRelid(rightRangeVar, NoLock, missingOk);
 
-	List *alterTableFKeyConstraints =
-		GetAlterTableStmtFKeyConstraintList(alterTableStatement);
+	if (leftRelationId > rightRelationId)
+	{
+		return 1;
+	}
+	else if (leftRelationId < rightRelationId)
+	{
+		return -1;
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+
+static List *
+GetAlterTableAddFKeyRelationIds(AlterTableStmt *alterTableStatement)
+{
+	List *constraintRangeVars = GetAlterTableAddFKeyRelationRangeVars(alterTableStatement);
+
+	LOCKMODE lockmode = AlterTableGetLockLevel(alterTableStatement->cmds);
+	List *constraintListRelations = GetRelationIdsFromRangeVarList(constraintRangeVars, lockmode,
+																   alterTableStatement->missing_ok);
+	return constraintListRelations;
+}
+
+
+static List *
+GetAlterTableAddFKeyRelationRangeVars(AlterTableStmt *alterTableStatement)
+{
+	List *alterTableFKeyConstraints = GetAlterTableStmtFKeyConstraintList(alterTableStatement);
 
 	/* add right relations */
-	List *constraintListRelations = GetConstraintListRelations(alterTableFKeyConstraints, lockmode,
-																alterTableStatement->missing_ok);
+	List *constraintRangeVars = GetConstraintListRelationRangeVars(alterTableFKeyConstraints);
 	/* add left relation */
-	constraintListRelations = lappend_oid(constraintListRelations, leftRelationId);
+	constraintRangeVars = lappend(constraintRangeVars, alterTableStatement->relation);
 
-	return constraintListRelations;
+	return constraintRangeVars;
 }
 
 
@@ -771,18 +808,33 @@ GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command)
 
 
 static List *
-GetConstraintListRelations(List *constraintList, LOCKMODE lockmode, bool missingOk)
+GetConstraintListRelationRangeVars(List *constraintList)
 {
 	List *constraintListRelations = NIL;
 
 	Constraint *constraint = NULL;
 	foreach_ptr(constraint, constraintList)
 	{
-		Oid rightRelationId = RangeVarGetRelid(constraint->pktable, lockmode, missingOk);
-		constraintListRelations = lappend_oid(constraintListRelations, rightRelationId);
+		constraintListRelations = lappend(constraintListRelations, constraint->pktable);
 	}
 
 	return constraintListRelations;
+}
+
+
+static List *
+GetRelationIdsFromRangeVarList(List *rangeVarList, LOCKMODE lockmode, bool missingOk)
+{
+	List *relationIdList = NIL;
+
+	RangeVar *rangeVar = NULL;
+	foreach_ptr(rangeVar, rangeVarList)
+	{
+		Oid rightRelationId = RangeVarGetRelid(rangeVar, lockmode, missingOk);
+		relationIdList = lappend_oid(relationIdList, rightRelationId);
+	}
+
+	return relationIdList;
 }
 
 
