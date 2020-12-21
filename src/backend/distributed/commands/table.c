@@ -678,9 +678,8 @@ static bool
 AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	AlterTableStmt *alterTableStatement)
 {
-	bool hasPostgresLocalTable = false;
-	bool hasCitusLocalTable = false;
-	bool hasReferenceTable = false;
+	bool rightHasPostgresLocalTable = false;
+	bool rightHasNonDistTable = false;
 
 	Oid atFKeyRelationId = InvalidOid;
 	List *atFKeyRelationIdList = GetAlterTableAddFKeyRelationIds(alterTableStatement);
@@ -688,19 +687,30 @@ AlterTableDefinesFKeyBetweenPostgresAndNonDistTable(
 	{
 		if (!IsCitusTable(atFKeyRelationId))
 		{
-			hasPostgresLocalTable = true;
+			rightHasPostgresLocalTable = true;
 		}
-		else if (IsCitusTableType(atFKeyRelationId, CITUS_LOCAL_TABLE))
+		else if (IsCitusTableType(atFKeyRelationId, CITUS_TABLE_WITH_NO_DIST_KEY))
 		{
-			hasCitusLocalTable = true;
-		}
-		else if (IsCitusTableType(atFKeyRelationId, REFERENCE_TABLE))
-		{
-			hasReferenceTable = true;
+			rightHasNonDistTable = true;
 		}
 	}
 
-	return (hasCitusLocalTable || hasReferenceTable) && hasPostgresLocalTable;
+	LOCKMODE lockmode = AlterTableGetLockLevel(alterTableStatement->cmds);
+	Oid leftRelationId = AlterTableLookupRelation(alterTableStatement, lockmode);
+
+	bool leftIsPostgresTable = !IsCitusTable(leftRelationId);
+	if (leftIsPostgresTable)
+	{
+		return rightHasNonDistTable;
+	}
+
+	bool leftIsNonDistTable = IsCitusTableType(leftRelationId, CITUS_TABLE_WITH_NO_DIST_KEY);
+	if (leftIsNonDistTable)
+	{
+		return rightHasPostgresLocalTable;
+	}
+
+	return false;
 }
 
 #if PG_VERSION_NUM >= PG_VERSION_13
@@ -717,6 +727,8 @@ static void
 ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTableStatement)
 {
 	List *atFKeyRelationRangeVars = GetAlterTableAddFKeyRelationRangeVars(alterTableStatement);
+	/* add left relation */
+	atFKeyRelationRangeVars = lappend(atFKeyRelationRangeVars, alterTableStatement->relation);
 
 	/* sort the list before converting each postgres local table to a citus local table */
 	atFKeyRelationRangeVars = SortList(atFKeyRelationRangeVars, CompareRangeVarsByOid);
@@ -792,12 +804,7 @@ static List *
 GetAlterTableAddFKeyRelationRangeVars(AlterTableStmt *alterTableStatement)
 {
 	List *alterTableFKeyConstraints = GetAlterTableStmtFKeyConstraintList(alterTableStatement);
-
-	/* add right relations */
 	List *constraintRangeVars = GetConstraintListRelationRangeVars(alterTableFKeyConstraints);
-	/* add left relation */
-	constraintRangeVars = lappend(constraintRangeVars, alterTableStatement->relation);
-
 	return constraintRangeVars;
 }
 
