@@ -42,6 +42,9 @@
 #include "utils/syscache.h"
 
 
+typedef bool (*AlterTableCommandFunc)(AlterTableCmd *);
+
+
 /* Local functions forward declarations for unsupported command checks */
 static void ProcessFKeysForTableCreation(RangeVar *relation);
 static void PostprocessCreateTableStmtPartitionOf(CreateStmt *createStatement,
