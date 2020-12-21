@@ -58,8 +58,8 @@ static void ConvertPostgresLocalTablesToCitusLocalTables(AlterTableStmt *alterTa
 static int CompareRangeVarsByOid(const void *leftElement, const void *rightElement);
 static List * GetAlterTableAddFKeyRelationIds(AlterTableStmt *alterTableStatement);
 static List * GetAlterTableAddFKeyRelationRangeVars(AlterTableStmt *alterTableStatement);
-static List * GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement);
-static List * GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command);
+static List * GetAlterTableStmtAddFKeyConstraintList(AlterTableStmt *alterTableStatement);
+static List * GetAlterTableCmdAddFKeyConstraintList(AlterTableCmd *command);
 static List * GetConstraintListRelationRangeVars(List *constraintList);
 static List * GetRelationIdsFromRangeVarList(List *rangeVarList, LOCKMODE lockmode, bool missingOk);
 static bool AlterTableCommandTypeIsTrigger(AlterTableType alterTableType);
@@ -803,18 +803,18 @@ GetAlterTableAddFKeyRelationIds(AlterTableStmt *alterTableStatement)
 static List *
 GetAlterTableAddFKeyRelationRangeVars(AlterTableStmt *alterTableStatement)
 {
-	List *alterTableFKeyConstraints = GetAlterTableStmtFKeyConstraintList(alterTableStatement);
+	List *alterTableFKeyConstraints = GetAlterTableStmtAddFKeyConstraintList(alterTableStatement);
 	List *constraintRangeVars = GetConstraintListRelationRangeVars(alterTableFKeyConstraints);
 	return constraintRangeVars;
 }
 
 
 /*
- * GetAlterTableStmtFKeyConstraintList returns a list of Constraint objects for
+ * GetAlterTableStmtAddFKeyConstraintList returns a list of Constraint objects for
  * the foreign keys that given ALTER TABLE statement defines.
  */
 static List *
-GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement)
+GetAlterTableStmtAddFKeyConstraintList(AlterTableStmt *alterTableStatement)
 {
 	List *alterTableFKeyConstraintList = NIL;
 
@@ -822,7 +822,7 @@ GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement)
 	AlterTableCmd *command = NULL;
 	foreach_ptr(command, commandList)
 	{
-		List *commandFKeyConstraintList = GetAlterTableCommandFKeyConstraintList(command);
+		List *commandFKeyConstraintList = GetAlterTableCmdAddFKeyConstraintList(command);
 		alterTableFKeyConstraintList = list_concat(alterTableFKeyConstraintList,
 												   commandFKeyConstraintList);
 	}
@@ -832,7 +832,7 @@ GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement)
 
 
 /*
- * GetAlterTableCommandFKeyConstraintList returns a list of Constraint objects
+ * GetAlterTableCmdAddFKeyConstraintList returns a list of Constraint objects
  * for the foreign keys that given ALTER TABLE subcommand defines. Note that
  * this is only possible if it is an:
  *  - ADD CONSTRAINT subcommand (explicitly defines) or,
@@ -840,7 +840,7 @@ GetAlterTableStmtFKeyConstraintList(AlterTableStmt *alterTableStatement)
  *    references to another table.
  */
 static List *
-GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command)
+GetAlterTableCmdAddFKeyConstraintList(AlterTableCmd *command)
 {
 	List *fkeyConstraintList = NIL;
 
