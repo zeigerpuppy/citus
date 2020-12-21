@@ -270,6 +270,7 @@ extern Node * WorkerProcessAlterTableStmt(AlterTableStmt *alterTableStatement,
 extern bool IsAlterTableRenameStmt(RenameStmt *renameStmt);
 extern void ErrorIfAlterDropsPartitionColumn(AlterTableStmt *alterTableStatement);
 extern void PostprocessAlterTableStmt(AlterTableStmt *pStmt);
+extern void UndistributeCitusLocalTablesIfNeeded(Node *node);
 extern void ErrorUnsupportedAlterTableAddColumn(Oid relationId, AlterTableCmd *command,
 												Constraint *constraint);
 extern void ErrorIfUnsupportedConstraint(Relation relation, char distributionMethod,

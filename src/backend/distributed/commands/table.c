@@ -24,6 +24,7 @@
 #include "distributed/commands/utility_hook.h"
 #include "distributed/deparser.h"
 #include "distributed/deparse_shard_query.h"
+#include "distributed/foreign_key_relationship.h"
 #include "distributed/listutils.h"
 #include "distributed/coordinator_protocol.h"
 #include "distributed/metadata_sync.h"
@@ -43,6 +44,7 @@
 
 
 typedef bool (*AlterTableCommandFunc)(AlterTableCmd *);
+static bool UndistributeCitusLocalTablesInProgress = false;
 
 
 /* Local functions forward declarations for unsupported command checks */
@@ -1179,6 +1181,62 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 			}
 		}
 	}
+}
+
+
+void
+UndistributeCitusLocalTablesIfNeeded(Node *node)
+{
+	if (!IsA(node, AlterTableStmt))
+	{
+		return;
+	}
+
+	AlterTableStmt *alterTableStatement = castNode(AlterTableStmt, node);
+	if (!AlterTableHasCommandByFunc(alterTableStatement, AlterTableCmdIsDropFkey))
+	{
+		return;
+	}
+
+	if (UndistributeCitusLocalTablesInProgress)
+	{
+		return;
+	}
+	UndistributeCitusLocalTablesInProgress = true;
+
+	List *citusLocalTableIdList = CitusTableTypeIdList(CITUS_LOCAL_TABLE);
+	/* sort before that */
+	citusLocalTableIdList = SortList(citusLocalTableIdList, CompareOids);
+
+	Oid citusLocalTableId = InvalidOid;
+	foreach_oid(citusLocalTableId, citusLocalTableIdList)
+	{
+		HeapTuple heapTuple = SearchSysCache1(RELOID, ObjectIdGetDatum(citusLocalTableId));
+		if (!HeapTupleIsValid(heapTuple))
+		{
+			/* undistribute table drops relation, skip if already undistributed via cascade */
+			continue;
+		}
+
+		ReleaseSysCache(heapTuple);
+
+		if (!IsCitusTableType(citusLocalTableId, CITUS_LOCAL_TABLE))
+		{
+			ereport(ERROR, (errmsg("we don't expect this")));
+		}
+
+		if (ConnectedToReferenceTableViaFKey(citusLocalTableId))
+		{
+			/* still connected to a reference table */
+			continue;
+		}
+
+		/* then undistribute via cascade */
+		bool cascade = true;
+		UndistributeTable(citusLocalTableId, cascade);
+	}
+
+	UndistributeCitusLocalTablesInProgress = false;
 }
 
 

@@ -124,7 +124,6 @@ static void DoCopyFromLocalTableIntoShards(Relation distributedRelation,
 										   DestReceiver *copyDest,
 										   TupleTableSlot *slot,
 										   EState *estate);
-static void UndistributeTable(Oid relationId, bool cascade);
 static List * GetViewCreationCommandsOfTable(Oid relationId);
 static void ReplaceTable(Oid sourceId, Oid targetId);
 
@@ -1552,7 +1551,7 @@ DistributionColumnUsesGeneratedStoredColumn(TupleDesc relationDesc,
  * The dropping of old table is done with CASCADE. Anything not mentioned here will
  * be dropped.
  */
-static void
+void
 UndistributeTable(Oid relationId, bool cascade)
 {
 	EnsureCoordinator();

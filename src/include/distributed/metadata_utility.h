@@ -157,6 +157,7 @@ extern void ErrorIfTableIsACatalogTable(Relation relation);
 extern void EnsureTableNotDistributed(Oid relationId);
 extern void EnsureReplicationSettings(Oid relationId, char replicationModel);
 extern bool RegularTable(Oid relationId);
+extern void UndistributeTable(Oid relationId, bool cascade);
 extern char * ConstructQualifiedShardName(ShardInterval *shardInterval);
 extern uint64 GetFirstShardId(Oid relationId);
 extern Datum StringToDatum(char *inputString, Oid dataType);

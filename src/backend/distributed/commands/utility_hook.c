@@ -609,6 +609,13 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 		PostprocessVacuumStmt(vacuumStmt, queryString);
 	}
 
+	/*
+	 * Undistribute table drops original relation and it's shards. If we did table this
+	 * table undistribution in post process, ddljobs executed on shards would fail. So
+	 * we need to do this after ExecuteDistributedDDLJob loop.
+	 */
+	UndistributeCitusLocalTablesIfNeeded(parsetree);
+
 	if (!IsDropCitusExtensionStmt(parsetree) && !IsA(parsetree, DropdbStmt))
 	{
 		/*

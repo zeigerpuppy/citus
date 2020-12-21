@@ -136,6 +136,26 @@ debug1_print_fkey_connected_relations(PG_FUNCTION_ARGS)
 }
 
 
+bool
+ConnectedToReferenceTableViaFKey(Oid relationId)
+{
+	List *fkeyConnectedRelations = GetFkeyConnectedRelations(relationId);
+	/* exclude yourself */
+	fkeyConnectedRelations = list_delete_oid(fkeyConnectedRelations, relationId);
+
+	Oid otherRelId = InvalidOid;
+	foreach_oid(otherRelId, fkeyConnectedRelations)
+	{
+		if (IsCitusTableType(otherRelId, REFERENCE_TABLE))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
 List *
 GetFkeyConnectedRelations(Oid relationId)
 {
