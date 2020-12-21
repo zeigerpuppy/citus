@@ -60,7 +60,10 @@ static List * GetAlterTableCommandFKeyConstraintList(AlterTableCmd *command);
 static List * GetConstraintListRelationRangeVars(List *constraintList);
 static List * GetRelationIdsFromRangeVarList(List *rangeVarList, LOCKMODE lockmode, bool missingOk);
 static bool AlterTableCommandTypeIsTrigger(AlterTableType alterTableType);
-static bool AlterTableHasAddDropForeignKey(AlterTableStmt *alterTableStatement);
+static bool AlterTableHasCommandByFunc(AlterTableStmt *alterTableStatement, AlterTableCommandFunc alterTableCommandFunc);
+static bool AlterTableCmdIsAddDropFkey(AlterTableCmd *command);
+static bool AlterTableCmdIsAddFkey(AlterTableCmd *command);
+static bool AlterTableCmdIsDropFkey(AlterTableCmd *command);
 static void ErrorIfUnsupportedAlterTableStmt(AlterTableStmt *alterTableStatement);
 static void ErrorIfCitusLocalTablePartitionCommand(AlterTableCmd *alterTableCmd,
 												   Oid parentRelationId);
@@ -458,7 +461,7 @@ PreprocessAlterTableStmt(Node *node, const char *alterTableCommand)
 		return PreprocessAlterTableStmt(node, alterTableCommand);
 	}
 
-	if (AlterTableHasAddDropForeignKey(alterTableStatement))
+	if (AlterTableHasCommandByFunc(alterTableStatement, AlterTableCmdIsAddDropFkey))
 	{
 		MarkInvalidateForeignKeyGraph();
 	}
@@ -1170,53 +1173,85 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 
 
 static bool
-AlterTableHasAddDropForeignKey(AlterTableStmt *alterTableStatement)
+AlterTableHasCommandByFunc(AlterTableStmt *alterTableStatement, AlterTableCommandFunc alterTableCommandFunc)
 {
 	LOCKMODE lockmode = AlterTableGetLockLevel(alterTableStatement->cmds);
 	Oid relationId = AlterTableLookupRelation(alterTableStatement, lockmode);
+	if (!OidIsValid(relationId))
+	{
+		ereport(ERROR, (errmsg("unexpected state")));
+	}
 
 	List *commandList = alterTableStatement->cmds;
 	AlterTableCmd *command = NULL;
 	foreach_ptr(command, commandList)
 	{
-		AlterTableType alterTableType = command->subtype;
-
-		if (alterTableType == AT_AddConstraint)
+		if (alterTableCommandFunc(command))
 		{
-			if (!OidIsValid(relationId))
-			{
-				continue;
-			}
-
-			Constraint *constraint = (Constraint *) command->def;
-			if (constraint->contype == CONSTR_FOREIGN)
-			{
-				return true;
-			}
-		}
-		else if (alterTableType == AT_DropConstraint)
-		{
-			if (!OidIsValid(relationId))
-			{
-				continue;
-			}
-
-			/*
-			 * don't check if a fkey constraint, we might be dropping a uniqueness
-			 * constraint that a fkey references.
-			 * TODO: fix this on master in a better way
-			 */
 			return true;
 		}
-		else if (alterTableType == AT_DropColumn)
-		{
-			if (!OidIsValid(relationId))
-			{
-				continue;
-			}
+	}
 
+	return false;
+}
+
+
+static bool
+AlterTableCmdIsAddDropFkey(AlterTableCmd *command)
+{
+	return AlterTableCmdIsAddFkey(command) || AlterTableCmdIsDropFkey(command);
+}
+
+
+static bool
+AlterTableCmdIsAddFkey(AlterTableCmd *command)
+{
+	AlterTableType alterTableType = command->subtype;
+
+	if (alterTableType == AT_AddConstraint)
+	{
+		Constraint *constraint = (Constraint *) command->def;
+		if (constraint->contype == CONSTR_FOREIGN)
+		{
 			return true;
 		}
+	}
+	else if (alterTableType == AT_AddColumn)
+	{
+		/*
+		 * don't check if a fkey constraint, we might be dropping a uniqueness
+		 * constraint that a fkey references.
+		 * TODO: fix this on master in a better way
+		 */
+		return true;
+	}
+
+	return false;
+}
+
+
+static bool
+AlterTableCmdIsDropFkey(AlterTableCmd *command)
+{
+	AlterTableType alterTableType = command->subtype;
+
+	if (alterTableType == AT_DropConstraint)
+	{
+		/*
+		 * don't check if a fkey constraint, we might be dropping a uniqueness
+		 * constraint that a fkey references.
+		 * TODO: fix this on master in a better way
+		 */
+		return true;
+	}
+	else if (alterTableType == AT_DropColumn)
+	{
+		/*
+		 * don't check if a fkey constraint, we might be dropping a uniqueness
+		 * constraint that a fkey references.
+		 * TODO: fix this on master in a better way
+		 */
+		return true;
 	}
 
 	return false;
