@@ -96,7 +96,7 @@ CascadeOperationForConnectedRelations(Oid relationId, LOCKMODE lockMode,
 											 cascadeOperationType);
 
 	/* now recreate foreign keys on tables */
-	ExecuteAndLogDDLCommandList(fKeyCreationCommands);
+	ExecuteForeignKeyCreateListSkipInvalidation(fKeyCreationCommands);
 }
 
 
@@ -368,6 +368,33 @@ ExecuteAndLogDDLCommand(const char *commandString)
 	ereport(DEBUG4, (errmsg("executing \"%s\"", commandString)));
 
 	Node *parseTree = ParseTreeNode(commandString);
+
 	CitusProcessUtility(parseTree, commandString, PROCESS_UTILITY_TOPLEVEL,
 						NULL, None_Receiver, NULL);
+}
+
+
+/*
+ * ExecuteForeignKeyCreateListSkipInvalidation takes a "ALTER TABLE .. ADD FOREIGN KEY"
+ * command and logs it in DEBUG4 log level. Then, parses, sets the invalidation and executes it via CitusProcessUtility.
+ */
+void
+ExecuteForeignKeyCreateListSkipInvalidation(List *ddlCommandList)
+{
+	char *ddlCommand = NULL;
+	foreach_ptr(ddlCommand, ddlCommandList)
+	{
+		ereport(NOTICE, (errmsg("executing fkey \"%s\"", ddlCommand)));
+
+		Node *parseTree = ParseTreeNode(ddlCommand);
+
+		if (IsA(parseTree, AlterTableStmt))
+		{
+			AlterTableStmt *alterTableStatement = (AlterTableStmt *) parseTree;
+			parseTree = AlterTableAddFkeySetSkipInvalidation(alterTableStatement, NULL);
+		}
+
+		CitusProcessUtility(parseTree, ddlCommand, PROCESS_UTILITY_TOPLEVEL,
+							NULL, None_Receiver, NULL);
+	}
 }

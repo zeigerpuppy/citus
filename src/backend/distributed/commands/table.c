@@ -772,13 +772,13 @@ PreprocessAlterTableSchemaStmt(Node *node, const char *queryString)
 
 
 /*
- * WorkerProcessAlterTableStmt checks and processes the alter table statement to be
- * worked on the distributed table of the worker node. Currently, it only processes
- * ALTER TABLE ... ADD FOREIGN KEY command to skip the validation step.
+ * AlterTableAddFkeySetSkipInvalidation checks and processes the alter table
+ * statement to be worked on the distributed table of the worker node. Currently,
+ * it only processes ALTER TABLE ... ADD FOREIGN KEY command to skip the
+ * validation step.
  */
 Node *
-WorkerProcessAlterTableStmt(AlterTableStmt *alterTableStatement,
-							const char *alterTableCommand)
+AlterTableAddFkeySetSkipInvalidation(AlterTableStmt *alterTableStatement)
 {
 	/* first check whether a distributed relation is affected */
 	if (alterTableStatement->relation == NULL)
@@ -789,12 +789,6 @@ WorkerProcessAlterTableStmt(AlterTableStmt *alterTableStatement,
 	LOCKMODE lockmode = AlterTableGetLockLevel(alterTableStatement->cmds);
 	Oid leftRelationId = AlterTableLookupRelation(alterTableStatement, lockmode);
 	if (!OidIsValid(leftRelationId))
-	{
-		return (Node *) alterTableStatement;
-	}
-
-	bool isCitusRelation = IsCitusTable(leftRelationId);
-	if (!isCitusRelation)
 	{
 		return (Node *) alterTableStatement;
 	}
@@ -816,7 +810,6 @@ WorkerProcessAlterTableStmt(AlterTableStmt *alterTableStatement,
 			Constraint *constraint = (Constraint *) command->def;
 			if (constraint->contype == CONSTR_FOREIGN)
 			{
-				/* foreign constraint validations will be done in shards. */
 				constraint->skip_validation = true;
 			}
 		}

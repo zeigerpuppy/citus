@@ -308,7 +308,7 @@ extern List * PostprocessAlterTableSchemaStmt(Node *node, const char *queryStrin
 extern List * PreprocessAlterTableStmt(Node *node, const char *alterTableCommand);
 extern List * PreprocessAlterTableMoveAllStmt(Node *node, const char *queryString);
 extern List * PreprocessAlterTableSchemaStmt(Node *node, const char *queryString);
-extern Node * WorkerProcessAlterTableStmt(AlterTableStmt *alterTableStatement,
+extern Node * AlterTableAddFkeySetSkipInvalidation(AlterTableStmt *alterTableStatement,
 										  const char *alterTableCommand);
 extern bool IsAlterTableRenameStmt(RenameStmt *renameStmt);
 extern void ErrorIfAlterDropsPartitionColumn(AlterTableStmt *alterTableStatement);
@@ -409,6 +409,7 @@ extern void CascadeOperationForConnectedRelations(Oid relationId, LOCKMODE relLo
 												  cascadeOperationType);
 extern void ExecuteAndLogDDLCommandList(List *ddlCommandList);
 extern void ExecuteAndLogDDLCommand(const char *commandString);
+extern void ExecuteForeignKeyCreateListSkipInvalidation(List *ddlCommandList);
 
 /* create_citus_local_table.c */
 extern void CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys);
