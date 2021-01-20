@@ -1166,6 +1166,10 @@ ALTER TABLE distributed_table_1 ADD CONSTRAINT fkey_3 FOREIGN KEY (col_1) REFERE
 ALTER TABLE citus_local_table_1 ADD CONSTRAINT fkey_4 FOREIGN KEY (col_1) REFERENCES reference_table_1(col_2);
 ALTER TABLE partitioned_table_1 ADD CONSTRAINT fkey_5 FOREIGN KEY (col_1) REFERENCES reference_table_1(col_2);
 SELECT undistribute_table('partitioned_table_1', cascade_via_foreign_keys=>true);
+NOTICE:  creating a new table for single_node.citus_local_table_1
+NOTICE:  Moving the data of single_node.citus_local_table_1
+NOTICE:  Dropping the old single_node.citus_local_table_1
+NOTICE:  Renaming the new table to single_node.citus_local_table_1
 NOTICE:  converting the partitions of single_node.partitioned_table_1
 NOTICE:  creating a new table for single_node.partitioned_table_1_100_200
 NOTICE:  Moving the data of single_node.partitioned_table_1_100_200
@@ -1186,10 +1190,6 @@ NOTICE:  creating a new table for single_node.distributed_table_1
 NOTICE:  Moving the data of single_node.distributed_table_1
 NOTICE:  Dropping the old single_node.distributed_table_1
 NOTICE:  Renaming the new table to single_node.distributed_table_1
-NOTICE:  creating a new table for single_node.citus_local_table_1
-NOTICE:  Moving the data of single_node.citus_local_table_1
-NOTICE:  Dropping the old single_node.citus_local_table_1
-NOTICE:  Renaming the new table to single_node.citus_local_table_1
  undistribute_table
 ---------------------------------------------------------------------
 
