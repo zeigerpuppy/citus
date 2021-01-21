@@ -386,7 +386,7 @@ ExecuteCascadeOperationForRelationIdList(List *relationIdList,
 		{
 			case CASCADE_FKEY_UNDISTRIBUTE_TABLE:
 			{
-				if (RelationExists(relationId) && IsCitusTable(relationId))
+				if (IsCitusTable(relationId))
 				{
 					TableConversionParameters params = {
 						.relationId = relationId,
