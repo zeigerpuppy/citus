@@ -99,8 +99,8 @@ static bool IsDropSchemaOrDB(Node *parsetree);
 static bool DropStmtDropsCitusTable(Node *parsetree);
 static bool DDLExecutedOnCitusTable(Node *parsetree, List *ddlJobs, bool dropsCitusTable);
 static bool IsDropSchema(Node *parsetree);
-static void UndistributeCitusLocalTablesIfNeeded(bool ddlExecutedOnCitusTable);
-static bool ShouldUndistributeCitusLocalTables(bool ddlExecutedOnCitusTable);
+static void UndistributeDisconnectedCitusLocalTables(void);
+static bool ShouldUndistributeCitusLocalTables(void);
 
 
 /*
@@ -257,14 +257,22 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 		bool ddlExecutedOnCitusTable = ProcessUtilityInternal(pstmt, queryString, context,
 															  params, queryEnv, dest,
 															  completionTag);
-		if (UtilityHookLevel == 1)
+		if (UtilityHookLevel == 1 && ddlExecutedOnCitusTable &&
+			ShouldUndistributeCitusLocalTables())
 		{
-			UndistributeCitusLocalTablesIfNeeded(ddlExecutedOnCitusTable);
+			ResetConstraintDropped();
+			UndistributeDisconnectedCitusLocalTables();
+		}
+		else if (UtilityHookLevel == 1)
+		{
+			/* we are leaving the utility hook, reset the value */
+			ResetConstraintDropped();
 		}
 	}
 	PG_CATCH();
 	{
 		UtilityHookLevel--;
+		ResetConstraintDropped();
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -763,18 +771,13 @@ IsDropSchema(Node *parsetree)
 
 
 /*
- * UndistributeCitusLocalTablesIfNeeded undistributes citus local tables that
+ * UndistributeDisconnectedCitusLocalTables undistributes citus local tables that
  * are not connected to any reference tables via their individual foreign key
  * subgraphs.
  */
 static void
-UndistributeCitusLocalTablesIfNeeded(bool ddlExecutedOnCitusTable)
+UndistributeDisconnectedCitusLocalTables(void)
 {
-	if (!ShouldUndistributeCitusLocalTables(ddlExecutedOnCitusTable))
-	{
-		return;
-	}
-
 	List *citusLocalTableIdList = CitusTableTypeIdList(CITUS_LOCAL_TABLE);
 	citusLocalTableIdList = SortList(citusLocalTableIdList, CompareOids);
 
@@ -820,7 +823,7 @@ UndistributeCitusLocalTablesIfNeeded(bool ddlExecutedOnCitusTable)
  * citus local tables for their connectivity to reference tables.
  */
 static bool
-ShouldUndistributeCitusLocalTables(bool ddlExecutedOnCitusTable)
+ShouldUndistributeCitusLocalTables(void)
 {
 	if (!ConstraintDropped)
 	{
@@ -832,13 +835,6 @@ ShouldUndistributeCitusLocalTables(bool ddlExecutedOnCitusTable)
 		return false;
 	}
 
-	ResetConstraintDropped();
-
-	if (!ddlExecutedOnCitusTable)
-	{
-		/* executing DDL command for a shard placement or for a postgres table */
-		return false;
-	}
 
 	if (!ShouldEnableLocalReferenceForeignKeys())
 	{
