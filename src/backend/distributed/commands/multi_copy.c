@@ -3739,7 +3739,13 @@ CopyGetPlacementConnection(HTAB *connectionStateHash, ShardPlacement *placement,
 
 			HandleRemoteTransactionConnectionError(connection, raiseErrors);
 
-			elog(INFO, "HandleRemoteTransactionConnectionError: Connection is NULL:PQstatus(connection->pgConn) %d", PQstatus(connection->pgConn));
+			long durationSeconds = 0.0;
+			int durationMicrosecs = 0;
+			TimestampDifference(connection->connectionStart, GetCurrentTimestamp(), &durationSeconds,
+								&durationMicrosecs);
+
+			elog(INFO, "HandleRemoteTransactionConnectionError: "
+					"Connection is NULL:PQstatus(connection->pgConn) %d   Difference durationSeconds:%d durationMicrosecse:%d", PQstatus(connection->pgConn),durationSeconds, durationMicrosecs);
 
 			return NULL;
 		}
