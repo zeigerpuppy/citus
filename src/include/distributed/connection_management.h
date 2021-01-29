@@ -152,6 +152,8 @@ typedef struct MultiConnection
 	uint64 copyBytesWrittenSinceLastFlush;
 
 	MultiConnectionStructInitializationState initilizationState;
+
+	uint64 tupleSentCount;
 } MultiConnection;
 
 
