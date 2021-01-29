@@ -3480,6 +3480,7 @@ InitializeCopyShardState(CopyShardState *shardState,
 		if (connection == NULL)
 		{
 			failedPlacementCount++;
+			elog(INFO, "Connection is NULL");
 			continue;
 		}
 
@@ -3515,6 +3516,7 @@ InitializeCopyShardState(CopyShardState *shardState,
 	/* if all placements failed, error out */
 	if (failedPlacementCount == list_length(activePlacementList))
 	{
+		elog(INFO, "Could not in InitializeCopyShardState");
 		ereport(ERROR, (errmsg("could not connect to any active placements")));
 	}
 
@@ -3736,6 +3738,8 @@ CopyGetPlacementConnection(HTAB *connectionStateHash, ShardPlacement *placement,
 			const bool raiseErrors = true;
 
 			HandleRemoteTransactionConnectionError(connection, raiseErrors);
+
+			elog(INFO, "HandleRemoteTransactionConnectionError: Connection is NULL:PQstatus(connection->pgConn) %d", PQstatus(connection->pgConn));
 
 			return NULL;
 		}
