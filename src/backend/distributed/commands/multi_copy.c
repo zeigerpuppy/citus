@@ -2498,6 +2498,7 @@ CitusSendTupleToPlacements(TupleTableSlot *slot, CitusCopyDestReceiver *copyDest
 
 		if (sendTupleOverConnection)
 		{
+			connectionState->connection->tupleSentCount++;
 			resetStringInfo(copyOutState->fe_msgbuf);
 			AppendCopyRowData(columnValues, columnNulls, tupleDescriptor,
 							  copyOutState, columnOutputFunctions, columnCoercionPaths);
@@ -3745,7 +3746,7 @@ CopyGetPlacementConnection(HTAB *connectionStateHash, ShardPlacement *placement,
 								&durationMicrosecs);
 
 			elog(INFO, "HandleRemoteTransactionConnectionError: "
-					"Connection is NULL:PQstatus(connection->pgConn) %d  connectionId: %ld Difference durationSeconds:%d durationMicrosecse:%d connectionState: %d", PQstatus(connection->pgConn),connection->connectionId,durationSeconds, durationMicrosecs, connection->connectionState);
+					"Connection is NULL:PQstatus(connection->pgConn) %d  connectionId: %ld Difference durationSeconds:%d durationMicrosecse:%d connectionState: %d  tupleCount: %ld", PQstatus(connection->pgConn),connection->connectionId,durationSeconds, durationMicrosecs, connection->connectionState, connection->tupleSentCount);
 
 			return NULL;
 		}
