@@ -324,7 +324,8 @@ static void CompleteCopyQueryTagCompat(QueryCompletionCompat *completionTag, uin
 									   processedRowCount);
 static void FinishLocalCopy(CitusCopyDestReceiver *copyDest);
 static void CloneCopyOutStateForLocalCopy(CopyOutState from, CopyOutState to);
-static bool ShouldExecuteCopyLocally(Oid relatioId, bool isIntermediateResult);
+static bool ShouldExecuteCopyLocally(List *shardIntervalList, bool isIntermediateResult);
+static bool ShardIntervalListHasLocalPlacements(List *shardIntervalList);
 static void LogLocalCopyExecution(uint64 shardId);
 
 
@@ -2113,7 +2114,7 @@ LocalCopyAllowed(bool isIntermediateResult)
  * an idempotent operation, we consider this side effect as acceptable.
  */
 static bool
-ShouldExecuteCopyLocally(Oid relationId, bool isIntermediateResult)
+ShouldExecuteCopyLocally(List *shardIntervalList, bool isIntermediateResult)
 {
 	if (GetCurrentLocalExecutionStatus() == LOCAL_EXECUTION_REQUIRED)
 	{
@@ -2140,6 +2141,10 @@ ShouldExecuteCopyLocally(Oid relationId, bool isIntermediateResult)
 	{
 		return true;
 	}
+	else if (!ShardIntervalListHasLocalPlacements(shardIntervalList))
+	{
+		return false;
+	}
 
 	/*
 	 * If we can reserve a connection, we should go ahead with
@@ -2154,6 +2159,27 @@ ShouldExecuteCopyLocally(Oid relationId, bool isIntermediateResult)
 	 * failures as the executor does.
 	 */
 	return !TryConnectionPossibilityForLocalPrimaryNode();
+}
+
+
+/*
+ * ShardIntervalListHasLocalPlacements returns true if any of the input
+ * shard placement has a local placement;
+ */
+static bool
+ShardIntervalListHasLocalPlacements(List *shardIntervalList)
+{
+	int32 localGroupId = GetLocalGroupId();
+	ShardInterval *shardInterval = NULL;
+	foreach_ptr(shardInterval, shardIntervalList)
+	{
+		if (FindShardPlacementOnGroup(localGroupId, shardInterval->shardId) != NULL)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 
@@ -2342,7 +2368,7 @@ CitusCopyDestReceiverStartup(DestReceiver *dest, int operation,
 		 * In this function, if needed, Citus may try to reserve a connection
 		 * to the local node as a side effect.
 		 */
-		copyDest->shouldUseLocalCopy = ShouldExecuteCopyLocally(tableId,
+		copyDest->shouldUseLocalCopy = ShouldExecuteCopyLocally(shardIntervalList,
 																isIntermediateResult);
 	}
 }
