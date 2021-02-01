@@ -10,7 +10,7 @@ SET citus.shard_replication_factor TO 1;
 CREATE TABLE test_stats (
     a   int,
     b   int
-);
+) USING COLUMNAR;
 
 SELECT create_distributed_table('test_stats', 'a');
 
@@ -20,7 +20,7 @@ CREATE STATISTICS s1 (dependencies) ON a, b FROM test_stats;
 CREATE TABLE "test'stats2" (
     a   int,
     b   int
-);
+) USING COLUMNAR;
 
 CREATE STATISTICS s2 (dependencies) ON a, b FROM "test'stats2";
 
@@ -28,7 +28,7 @@ SELECT create_distributed_table('test''stats2', 'a');
 
 -- test when stats is on a different schema
 CREATE SCHEMA sc1;
-CREATE TABLE tbl (a int, "B" text);
+CREATE TABLE tbl (a int, "B" text) USING COLUMNAR;
 SELECT create_distributed_table ('tbl', 'a');
 
 CREATE STATISTICS sc1.st1 ON a, "B" FROM tbl;
@@ -37,7 +37,7 @@ CREATE STATISTICS sc1.st1 ON a, "B" FROM tbl;
 CREATE TABLE test_stats3 (
     a int,
     b int
-);
+) USING COLUMNAR;
 CREATE SCHEMA sc2;
 CREATE STATISTICS sc2."neW'Stat" ON a,b FROM test_stats3;
 SELECT create_distributed_table ('test_stats3','a');
@@ -46,7 +46,7 @@ SELECT create_distributed_table ('test_stats3','a');
 CREATE TABLE test_stats4 (
     a int,
     b int
-);
+) USING COLUMNAR; 
 SELECT create_reference_table ('test_stats4');
 
 CREATE STATISTICS s3 ON a,b FROM test_stats3;
@@ -70,13 +70,13 @@ ALTER STATISTICS s7 SET SCHEMA test_alter_schema;
 -- test alter owner
 ALTER STATISTICS sc2."neW'Stat" OWNER TO pg_monitor;
 -- test alter owner before distribution
-CREATE TABLE ownertest(a int, b int);
+CREATE TABLE ownertest(a int, b int) USING COLUMNAR;
 CREATE STATISTICS sc1.s9 ON a,b FROM ownertest;
 ALTER STATISTICS sc1.s9 OWNER TO pg_signal_backend;
 SELECT create_distributed_table('ownertest','a');
 
 -- test invalid column expressions
-CREATE TABLE test (x int, y int);
+CREATE TABLE test (x int, y int) USING COLUMNAR;
 SELECT create_distributed_table('test','x');
 
 CREATE STATISTICS stats_xy ON (x, y) FROM test;

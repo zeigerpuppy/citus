@@ -14,56 +14,51 @@ begin;
 SET LOCAL citus.multi_shard_modify_mode TO 'sequential';
 
 create table countries(
-      id serial primary key
+      id serial
     , name text
-    , code varchar(2) collate "C" unique
-);
+    , code varchar(2) collate "C"
+) USING COLUMNAR;
 insert into countries(name, code) select 'country-'||i, i::text from generate_series(10,99) i;
 select create_reference_table('countries');
 
 create table orgs (
-      id bigserial primary key
+      id bigserial
     , name text
     , created_at timestamptz default now()
-);
+)  USING COLUMNAR;
 select create_distributed_table('orgs', 'id');
 
 \if :server_version_above_eleven
 -- pg12 and above support generated columns
 create table users (
       id bigserial
-    , org_id bigint references orgs(id)
+    , org_id bigint
     , name text
     , created_at timestamptz default now()
     , country_id int -- references countries(id)
     , score bigint generated always as (id + country_id) stored
-    , primary key (org_id, id)
-);
+)  USING COLUMNAR;
 \else
 -- pg11 and below don't have generated columns, use a normal column
 create table users (
       id bigserial
-    , org_id bigint references orgs(id)
+    , org_id bigint 
     , name text
     , created_at timestamptz default now()
     , country_id int -- references countries(id)
     , score bigint
-    , primary key (org_id, id)
-);
+)  USING COLUMNAR;
 \endif
 
 select create_distributed_table('users', 'org_id');
-alter table users add constraint fk_user_country foreign key (country_id) references countries(id);
 
 create table orders (
       id bigserial
-    , org_id bigint references orgs(id)
+    , org_id bigint
     , user_id bigint
     , price int
     , info jsonb
-    , primary key (org_id, id)
-    , foreign key (org_id, user_id) references users(org_id, id)
-);
+) USING COLUMNAR;
 select create_distributed_table('orders', 'org_id');
 
 create table events (
@@ -73,16 +68,14 @@ create table events (
     , event_time timestamp not null default now()
     , event_type int not null default 0
     , payload jsonb
-    , primary key (user_id, id)
-);
-create index event_time_idx on events using BRIN (event_time);
-create index event_json_idx on events using gin(payload);
+) USING COLUMNAR;
+
 select create_distributed_table('events', 'user_id'); -- on purpose don't collocate on correctly on org_id
 
 create table local_data(
-      id bigserial primary key
+      id bigserial
     , val int default ( (random()*100)::int )
-);
+) USING COLUMNAR;
 
 -- data loading takes ~30 seconds, lets hope we can skip this for all reproductions. When
 -- there is a sqlsmith failure that needs the data we can uncomment the block below.

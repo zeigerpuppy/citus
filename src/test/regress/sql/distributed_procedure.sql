@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION wait_until_metadata_sync(timeout INTEGER DEFAULT 1500
     AS 'citus';
 
 -- procedures are distributed by text arguments, when run in isolation it is not guaranteed a table actually exists.
-CREATE TABLE colocation_table(id text);
+CREATE TABLE colocation_table(id text) USING COLUMNAR;
 SET citus.replication_model TO 'streaming';
 SET citus.shard_replication_factor TO 1;
 SELECT create_distributed_table('colocation_table','id');

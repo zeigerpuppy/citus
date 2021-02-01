@@ -1,7 +1,7 @@
 CREATE SCHEMA cte_inline;
 SET search_path TO cte_inline;
 SET citus.next_shard_id TO 1960000;
-CREATE TABLE test_table (key int, value text, other_value jsonb);
+CREATE TABLE test_table (key int, value text, other_value jsonb) USING COLUMNAR;
 SELECT create_distributed_table ('test_table', 'key');
 
 INSERT INTO test_table SELECT i % 10, 'test' || i, row_to_json(row(i, i*18, 'test' || i)) FROM generate_series (0, 100) i;
@@ -455,6 +455,8 @@ WITH cte_1 AS NOT MATERIALIZED (DELETE FROM test_table WHERE key % 3 = 0 RETURNI
 SELECT count(*) FROM cte_1;
 
 -- cte with column aliases
+TRUNCATE test_table;
+INSERT INTO test_table SELECT i % 10, 'test' || i, row_to_json(row(i, i*18, 'test' || i)) FROM generate_series (0, 3) i;
 SELECT * FROM test_table,
 (WITH cte_1 (x,y) AS (SELECT * FROM test_table),
      cte_2 (z,y) AS (SELECT value, other_value, key FROM test_table),

@@ -11,9 +11,9 @@ SET citus.shard_count TO 4;
 
 -- test notice
 CREATE TABLE notices (
-    id int primary key,
+    id int,
     message text
-);
+) USING COLUMNAR;
 SELECT create_distributed_table('notices', 'id');
 INSERT INTO notices VALUES (1, 'hello world');
 
@@ -166,13 +166,13 @@ CREATE AGGREGATE agg_names(x dup_result, yz dup_result) (
 SET citus.enable_ddl_propagation TO on;
 
 -- use an unusual type to force a new colocation group
-CREATE TABLE statement_table(id int2);
+CREATE TABLE statement_table(id int2)  USING COLUMNAR;
 SET citus.replication_model TO 'statement';
 SET citus.shard_replication_factor TO 1;
 SELECT create_distributed_table('statement_table','id');
 
 -- create a table uses streaming-based replication (can be synced)
-CREATE TABLE streaming_table(id macaddr);
+CREATE TABLE streaming_table(id macaddr)  USING COLUMNAR;
 SET citus.replication_model TO 'streaming';
 SET citus.shard_replication_factor TO 1;
 SELECT create_distributed_table('streaming_table','id');
@@ -376,7 +376,7 @@ SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)','$1')
 
 -- a function cannot be colocated with a table that is not "streaming" replicated
 SET citus.shard_replication_factor TO 2;
-CREATE TABLE replicated_table_func_test (a macaddr);
+CREATE TABLE replicated_table_func_test (a macaddr)  USING COLUMNAR;;
 SET citus.replication_model TO "statement";
 SELECT create_distributed_table('replicated_table_func_test', 'a');
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', '$1', colocate_with:='replicated_table_func_test');
@@ -386,7 +386,7 @@ SELECT public.wait_until_metadata_sync(30000);
 -- a function can be colocated with a different distribution argument type
 -- as long as there is a coercion path
 SET citus.shard_replication_factor TO 1;
-CREATE TABLE replicated_table_func_test_2 (a macaddr8);
+CREATE TABLE replicated_table_func_test_2 (a macaddr8)  USING COLUMNAR;
 SET citus.replication_model TO "streaming";
 SELECT create_distributed_table('replicated_table_func_test_2', 'a');
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', 'val1', colocate_with:='replicated_table_func_test_2');
@@ -395,12 +395,12 @@ SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', 'val
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', colocate_with:='replicated_table_func_test_2');
 
 -- a function cannot be colocated with a local table
-CREATE TABLE replicated_table_func_test_3 (a macaddr8);
+CREATE TABLE replicated_table_func_test_3 (a macaddr8) USING COLUMNAR;
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', 'val1', colocate_with:='replicated_table_func_test_3');
 
 -- finally, colocate the function with a distributed table
 SET citus.shard_replication_factor TO 1;
-CREATE TABLE replicated_table_func_test_4 (a macaddr);
+CREATE TABLE replicated_table_func_test_4 (a macaddr)  USING COLUMNAR;
 SET citus.replication_model TO "streaming";
 SELECT create_distributed_table('replicated_table_func_test_4', 'a');
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', '$1', colocate_with:='replicated_table_func_test_4');
@@ -457,7 +457,7 @@ SELECT public.wait_until_metadata_sync(30000);
 
 SET citus.shard_replication_factor TO 1;
 SET citus.shard_count TO 4;
-CREATE TABLE test (id int, name text);
+CREATE TABLE test (id int, name text)  USING COLUMNAR;
 SELECT create_distributed_table('test','id');
 INSERT INTO test VALUES (3,'three');
 

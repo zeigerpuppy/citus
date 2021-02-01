@@ -1,7 +1,7 @@
 CREATE SCHEMA postgres_local_table;
 SET search_path TO postgres_local_table;
 
-CREATE TABLE local_table(a INT);
+CREATE TABLE local_table(a INT) USING COLUMNAR;
 INSERT INTO local_table VALUES (1),(2),(3);
 
 CREATE RECURSIVE VIEW recursive_view(val_1, val_2) AS
@@ -16,7 +16,7 @@ CREATE RECURSIVE VIEW recursive_view(val_1, val_2) AS
 
 CREATE RECURSIVE VIEW recursive_defined_non_recursive_view(c) AS (SELECT 1 FROM local_table);
 
-CREATE TABLE ref_table(a int, b INT);
+CREATE TABLE ref_table(a int, b INT) USING COLUMNAR;
 SELECT create_reference_table('ref_table');
 INSERT INTO ref_table VALUES (1,1);
 

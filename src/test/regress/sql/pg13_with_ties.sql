@@ -7,7 +7,7 @@ SELECT substring(:'server_version', '\d+')::int > 12 AS server_version_above_twe
 \endif
 
 
-CREATE TABLE with_ties_table (a INT, b INT);
+CREATE TABLE with_ties_table (a INT, b INT) WITH COLUMNAR;
 SELECT create_distributed_table('with_ties_table', 'a');
 INSERT INTO with_ties_table VALUES (10, 20), (11, 21), (12, 22), (12, 22), (12, 22), (12, 23), (14, 24);
 
@@ -25,7 +25,7 @@ SELECT b FROM with_ties_table WHERE a=12 ORDER BY b OFFSET 1 FETCH FIRST 1 ROWS 
 
 
 -- test INSERT SELECTs into local table
-CREATE TABLE with_ties_table_2 (a INT, b INT);
+CREATE TABLE with_ties_table_2 (a INT, b INT) WITH COLUMNAR;
 
 -- test ordering by distribution column
 INSERT INTO with_ties_table_2 SELECT a, b FROM with_ties_table ORDER BY a OFFSET 1 FETCH FIRST 2 ROWS WITH TIES;

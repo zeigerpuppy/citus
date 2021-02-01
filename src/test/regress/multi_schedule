@@ -75,17 +75,6 @@ test: multi_create_fdw
 # NOTE: The next 6 were in parallel originally, but we got "too many
 # connection" errors on CI. Requires investigation before doing them in
 # parallel again.
-test: subquery_basics
-test: subquery_local_tables
-test: subquery_executors
-test: subquery_and_cte
-test: set_operations
-test: set_operation_and_local_tables
-
-test: subqueries_deep subquery_view subquery_partitioning subqueries_not_supported
-test: subquery_in_targetlist subquery_in_where subquery_complex_target_list
-test: subquery_prepared_statements
-test: non_colocated_leaf_subquery_joins non_colocated_subquery_joins non_colocated_join_order
 test: cte_inline recursive_view_local_table
 test: pg13 pg12
 test: tableam

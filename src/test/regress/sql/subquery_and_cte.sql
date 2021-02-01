@@ -381,7 +381,7 @@ FROM
 WHERE foo.user_id = bar.user_id
 ORDER BY 1 DESC;
 
-CREATE TABLE ref_table_1 (a int);
+CREATE TABLE ref_table_1 (a int) USING COLUMNAR;
 SELECT create_reference_table('ref_table_1');
 
 CREATE TABLE ref_table_2 (a int);
