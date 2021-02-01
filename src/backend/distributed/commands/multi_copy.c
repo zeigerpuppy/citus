@@ -79,6 +79,7 @@
 #include "distributed/multi_physical_planner.h"
 #include "distributed/multi_router_planner.h"
 #include "distributed/multi_executor.h"
+#include "distributed/listutils.h"
 #include "distributed/locally_reserved_shared_connections.h"
 #include "distributed/placement_connection.h"
 #include "distributed/relation_access_tracking.h"
@@ -319,11 +320,12 @@ static bool CitusCopyDestReceiverReceive(TupleTableSlot *slot,
 static void CitusCopyDestReceiverShutdown(DestReceiver *destReceiver);
 static void CitusCopyDestReceiverDestroy(DestReceiver *destReceiver);
 static bool ContainsLocalPlacement(int64 shardId);
+static bool RelationHasLocalPlacements(Oid relationId);
 static void CompleteCopyQueryTagCompat(QueryCompletionCompat *completionTag, uint64
 									   processedRowCount);
 static void FinishLocalCopy(CitusCopyDestReceiver *copyDest);
 static void CloneCopyOutStateForLocalCopy(CopyOutState from, CopyOutState to);
-static bool ShouldExecuteCopyLocally(bool isIntermediateResult);
+static bool ShouldExecuteCopyLocally(Oid relatioId, bool isIntermediateResult);
 static void LogLocalCopyExecution(uint64 shardId);
 
 
@@ -2108,7 +2110,7 @@ LocalCopyAllowed(bool isIntermediateResult)
  * operation should be done locally for local placements.
  */
 static bool
-ShouldExecuteCopyLocally(bool isIntermediateResult)
+ShouldExecuteCopyLocally(Oid relationId, bool isIntermediateResult)
 {
 	if (GetCurrentLocalExecutionStatus() == LOCAL_EXECUTION_REQUIRED)
 	{
@@ -2134,6 +2136,14 @@ ShouldExecuteCopyLocally(bool isIntermediateResult)
 	else if (IsMultiStatementTransaction())
 	{
 		return true;
+	}
+	else if (OidIsValid(relationId) && !RelationHasLocalPlacements(relationId))
+	{
+		/*
+		 * The relation doesn't have any local placements, no need
+		 * to consider local copy.
+		 */
+		return false;
 	}
 
 	/*
@@ -2333,7 +2343,8 @@ CitusCopyDestReceiverStartup(DestReceiver *dest, int operation,
 	bool isIntermediateResult = copyDest->intermediateResultIdPrefix != NULL;
 	if (LocalCopyAllowed(isIntermediateResult))
 	{
-		copyDest->shouldUseLocalCopy = ShouldExecuteCopyLocally(isIntermediateResult);
+		copyDest->shouldUseLocalCopy = ShouldExecuteCopyLocally(tableId,
+																isIntermediateResult);
 	}
 }
 
@@ -2548,6 +2559,30 @@ RemovePlacementStateFromCopyConnectionStateBuffer(CopyConnectionState *connectio
 {
 	dlist_delete(&placementState->bufferedPlacementNode);
 	connectionState->bufferedPlacementCount--;
+}
+
+
+/*
+ * RelationHasLocalPlacements returns true if the input relation
+ * has any placements that are local to the node.
+ */
+static bool
+RelationHasLocalPlacements(Oid relationId)
+{
+	List *shardList = LoadShardList(relationId);
+	uint64 *shardIdPointer = NULL;
+
+	foreach_ptr(shardIdPointer, shardList)
+	{
+		uint64 shardId = *shardIdPointer;
+
+		if (ContainsLocalPlacement(shardId))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 
