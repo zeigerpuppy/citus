@@ -320,7 +320,6 @@ static bool CitusCopyDestReceiverReceive(TupleTableSlot *slot,
 static void CitusCopyDestReceiverShutdown(DestReceiver *destReceiver);
 static void CitusCopyDestReceiverDestroy(DestReceiver *destReceiver);
 static bool ContainsLocalPlacement(int64 shardId);
-static bool RelationHasLocalPlacements(Oid relationId);
 static void CompleteCopyQueryTagCompat(QueryCompletionCompat *completionTag, uint64
 									   processedRowCount);
 static void FinishLocalCopy(CitusCopyDestReceiver *copyDest);
@@ -2141,14 +2140,6 @@ ShouldExecuteCopyLocally(Oid relationId, bool isIntermediateResult)
 	{
 		return true;
 	}
-	else if (OidIsValid(relationId) && !RelationHasLocalPlacements(relationId))
-	{
-		/*
-		 * The relation doesn't have any local placements, no need
-		 * to consider local copy.
-		 */
-		return false;
-	}
 
 	/*
 	 * If we can reserve a connection, we should go ahead with
@@ -2567,30 +2558,6 @@ RemovePlacementStateFromCopyConnectionStateBuffer(CopyConnectionState *connectio
 {
 	dlist_delete(&placementState->bufferedPlacementNode);
 	connectionState->bufferedPlacementCount--;
-}
-
-
-/*
- * RelationHasLocalPlacements returns true if the input relation
- * has any placements that are local to the node.
- */
-static bool
-RelationHasLocalPlacements(Oid relationId)
-{
-	List *shardList = LoadShardList(relationId);
-	uint64 *shardIdPointer = NULL;
-
-	foreach_ptr(shardIdPointer, shardList)
-	{
-		uint64 shardId = *shardIdPointer;
-
-		if (ContainsLocalPlacement(shardId))
-		{
-			return true;
-		}
-	}
-
-	return false;
 }
 
 
