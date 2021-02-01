@@ -327,6 +327,10 @@ TryConnectionPossibilityForLocalPrimaryNode(void)
 
 	if (localNode == NULL)
 	{
+		/*
+		 * If the local node is not a primary node, we should not try to
+		 * reserve a connection as there cannot be any shards.
+		 */
 		return false;
 	}
 

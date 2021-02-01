@@ -2108,6 +2108,10 @@ LocalCopyAllowed(bool isIntermediateResult)
 /*
  * ShouldExecuteCopyLocally returns true if the current copy
  * operation should be done locally for local placements.
+ *
+ * If needed, the function may try to reserve a connection to local
+ * node as a side effect. But given that connection reservation is
+ * an idempotent operation, we consider this side effect as acceptable.
  */
 static bool
 ShouldExecuteCopyLocally(Oid relationId, bool isIntermediateResult)
@@ -2343,6 +2347,10 @@ CitusCopyDestReceiverStartup(DestReceiver *dest, int operation,
 	bool isIntermediateResult = copyDest->intermediateResultIdPrefix != NULL;
 	if (LocalCopyAllowed(isIntermediateResult))
 	{
+		/*
+		 * In this function, if needed, Citus may try to reserve a connection
+		 * to the local node as a side effect.
+		 */
 		copyDest->shouldUseLocalCopy = ShouldExecuteCopyLocally(tableId,
 																isIntermediateResult);
 	}
