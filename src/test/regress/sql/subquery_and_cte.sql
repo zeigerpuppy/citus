@@ -8,7 +8,7 @@ SET citus.enable_cte_inlining TO false;
 
 CREATE TABLE users_table_local AS SELECT * FROM users_table;
 
-CREATE TABLE dist_table (id int, value int);
+CREATE TABLE dist_table (id int, value int)  USING COLUMNAR;
 SELECT create_distributed_table('dist_table', 'id', colocate_with => 'users_table');
 INSERT INTO dist_table (id, value) VALUES(1, 2),(2, 3),(3,4);
 
@@ -381,13 +381,13 @@ FROM
 WHERE foo.user_id = bar.user_id
 ORDER BY 1 DESC;
 
-CREATE TABLE ref_table_1 (a int);
+CREATE TABLE ref_table_1 (a int) USING COLUMNAR:
 SELECT create_reference_table('ref_table_1');
 
-CREATE TABLE ref_table_2 (a int);
+CREATE TABLE ref_table_2 (a int) USING COLUMNAR:
 SELECT create_reference_table('ref_table_2');
 
-CREATE TABLE dist (a int,  b text);
+CREATE TABLE dist (a int,  b text) USING COLUMNAR:
 SELECT create_distributed_table('dist', 'a');
 
 INSERT INTO ref_table_1 SELECT * FROM generate_series(1, 10);

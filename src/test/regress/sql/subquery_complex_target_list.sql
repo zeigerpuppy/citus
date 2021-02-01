@@ -300,12 +300,12 @@ COMMIT;
 
 SET client_min_messages TO DEFAULT;
 
-CREATE TABLE items (key text primary key, value text not null, t timestamp);
+CREATE TABLE items (key text , value text not null, t timestamp) USING COLUMNAR;
 SELECT create_distributed_table('items','key');
 INSERT INTO items VALUES ('key-1','value-2', '2020-01-01 00:00');
 INSERT INTO items VALUES ('key-2','value-1', '2020-02-02 00:00');
 
-CREATE TABLE other_items (key text primary key, value text not null);
+CREATE TABLE other_items (key text , value text not null) USING COLUMNAR;
 SELECT create_distributed_table('other_items','key');
 INSERT INTO other_items VALUES ('key-1','value-2');
 

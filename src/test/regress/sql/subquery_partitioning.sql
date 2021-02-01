@@ -11,8 +11,8 @@ CREATE TABLE events_table_local AS SELECT * FROM events_table;
 CREATE TABLE partitioning_test(id int, value_1 int, time date) PARTITION BY RANGE (time);
 
 -- create its partitions
-CREATE TABLE partitioning_test_2017 PARTITION OF partitioning_test FOR VALUES FROM ('2017-01-01') TO ('2018-01-01');
-CREATE TABLE partitioning_test_2010 PARTITION OF partitioning_test FOR VALUES FROM ('2010-01-01') TO ('2011-01-01');
+CREATE TABLE partitioning_test_2017 PARTITION OF partitioning_test FOR VALUES FROM ('2017-01-01') TO ('2018-01-01') USING COLUMNAR;
+CREATE TABLE partitioning_test_2010 PARTITION OF partitioning_test FOR VALUES FROM ('2010-01-01') TO ('2011-01-01') USING COLUMNAR;
 
 -- load some data and distribute tables
 INSERT INTO partitioning_test VALUES (1, 1, '2017-11-23');

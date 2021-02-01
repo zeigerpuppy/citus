@@ -44,8 +44,7 @@ CREATE TABLE lineitem (
 	l_receiptdate date not null,
 	l_shipinstruct char(25) not null,
 	l_shipmode char(10) not null,
-	l_comment varchar(44) not null,
-	PRIMARY KEY(l_orderkey, l_linenumber) );
+	l_comment varchar(44) not null) USING COLUMNAR;
 SELECT create_distributed_table('lineitem', 'l_orderkey', 'append');
 
 CREATE INDEX lineitem_time_index ON lineitem (l_shipdate);
@@ -59,8 +58,7 @@ CREATE TABLE orders (
 	o_orderpriority char(15) not null,
 	o_clerk char(15) not null,
 	o_shippriority integer not null,
-	o_comment varchar(79) not null,
-	PRIMARY KEY(o_orderkey) );
+	o_comment varchar(79) not null ) USING COLUMNAR;
 SELECT create_distributed_table('orders', 'o_orderkey', 'append');
 
 CREATE TABLE orders_reference (
@@ -72,8 +70,7 @@ CREATE TABLE orders_reference (
 	o_orderpriority char(15) not null,
 	o_clerk char(15) not null,
 	o_shippriority integer not null,
-	o_comment varchar(79) not null,
-	PRIMARY KEY(o_orderkey) );
+	o_comment varchar(79) not null ) USING COLUMNAR;
 SELECT create_reference_table('orders_reference');
 
 
@@ -85,7 +82,7 @@ CREATE TABLE customer (
 	c_phone char(15) not null,
 	c_acctbal decimal(15,2) not null,
 	c_mktsegment char(10) not null,
-	c_comment varchar(117) not null);
+	c_comment varchar(117) not null) USING COLUMNAR;
 SELECT create_reference_table('customer');
 
 CREATE TABLE customer_append (
@@ -96,14 +93,14 @@ CREATE TABLE customer_append (
 	c_phone char(15) not null,
 	c_acctbal decimal(15,2) not null,
 	c_mktsegment char(10) not null,
-	c_comment varchar(117) not null);
+	c_comment varchar(117) not null) USING COLUMNAR;
 SELECT create_distributed_table('customer_append', 'c_custkey', 'append');
 
 CREATE TABLE nation (
 	n_nationkey integer not null,
 	n_name char(25) not null,
 	n_regionkey integer not null,
-	n_comment varchar(152));
+	n_comment varchar(152)) USING COLUMNAR;
 
 SELECT create_reference_table('nation');
 
@@ -116,7 +113,7 @@ CREATE TABLE part (
 	p_size integer not null,
 	p_container char(10) not null,
 	p_retailprice decimal(15,2) not null,
-	p_comment varchar(23) not null);
+	p_comment varchar(23) not null) USING COLUMNAR;
 SELECT create_reference_table('part');
 
 CREATE TABLE part_append (
@@ -128,7 +125,7 @@ CREATE TABLE part_append (
 	p_size integer not null,
 	p_container char(10) not null,
 	p_retailprice decimal(15,2) not null,
-	p_comment varchar(23) not null);
+	p_comment varchar(23) not null) USING COLUMNAR; 
 SELECT create_distributed_table('part_append', 'p_partkey', 'append');
 
 CREATE TABLE supplier
@@ -140,7 +137,7 @@ CREATE TABLE supplier
 	s_phone char(15) not null,
 	s_acctbal decimal(15,2) not null,
 	s_comment varchar(101) not null
-);
+) USING COLUMNAR;
 SELECT create_reference_table('supplier');
 
 -- create a single shard supplier table which is not
@@ -154,15 +151,15 @@ CREATE TABLE supplier_single_shard
  	s_phone char(15) not null,
   	s_acctbal decimal(15,2) not null,
   	s_comment varchar(101) not null
-);
+) USING COLUMNAR;
 SELECT create_distributed_table('supplier_single_shard', 's_suppkey', 'append');
 
-CREATE TABLE mx_table_test (col1 int, col2 text);
+CREATE TABLE mx_table_test (col1 int, col2 text) USING COLUMNAR;
 
 SET citus.next_shard_id TO 360009;
 
 -- Test initial data loading
-CREATE TABLE data_load_test (col1 int, col2 text, col3 serial);
+CREATE TABLE data_load_test (col1 int, col2 text, col3 serial) USING COLUMNAR;
 INSERT INTO data_load_test VALUES (132, 'hello');
 INSERT INTO data_load_test VALUES (243, 'world');
 
@@ -179,24 +176,24 @@ SELECT * FROM data_load_test ORDER BY col1;
 DROP TABLE data_load_test;
 
 -- test queries on distributed tables with no shards
-CREATE TABLE no_shard_test (col1 int, col2 text);
+CREATE TABLE no_shard_test (col1 int, col2 text) USING COLUMNAR;
 SELECT create_distributed_table('no_shard_test', 'col1', 'append');
 SELECT * FROM no_shard_test WHERE col1 > 1;
 DROP TABLE no_shard_test;
 
-CREATE TABLE no_shard_test (col1 int, col2 text);
+CREATE TABLE no_shard_test (col1 int, col2 text) USING COLUMNAR;
 SELECT create_distributed_table('no_shard_test', 'col1', 'range');
 SELECT * FROM no_shard_test WHERE col1 > 1;
 DROP TABLE no_shard_test;
 
-CREATE TABLE no_shard_test (col1 int, col2 text);
+CREATE TABLE no_shard_test (col1 int, col2 text) USING COLUMNAR;
 SELECT master_create_distributed_table('no_shard_test', 'col1', 'hash');
 SELECT * FROM no_shard_test WHERE col1 > 1;
 DROP TABLE no_shard_test;
 
 -- ensure writes in the same transaction as create_distributed_table are visible
 BEGIN;
-CREATE TABLE data_load_test (col1 int, col2 text, col3 serial);
+CREATE TABLE data_load_test (col1 int, col2 text, col3 serial) USING COLUMNAR;
 INSERT INTO data_load_test VALUES (132, 'hello');
 SELECT create_distributed_table('data_load_test', 'col1');
 INSERT INTO data_load_test VALUES (243, 'world');
@@ -206,11 +203,11 @@ DROP TABLE data_load_test;
 
 -- creating co-located distributed tables in the same transaction works
 BEGIN;
-CREATE TABLE data_load_test1 (col1 int, col2 text, col3 serial);
+CREATE TABLE data_load_test1 (col1 int, col2 text, col3 serial) USING COLUMNAR;
 INSERT INTO data_load_test1 VALUES (132, 'hello');
 SELECT create_distributed_table('data_load_test1', 'col1');
 
-CREATE TABLE data_load_test2 (col1 int, col2 text, col3 serial);
+CREATE TABLE data_load_test2 (col1 int, col2 text, col3 serial) USING COLUMNAR;
 INSERT INTO data_load_test2 VALUES (132, 'world');
 SELECT create_distributed_table('data_load_test2', 'col1');
 

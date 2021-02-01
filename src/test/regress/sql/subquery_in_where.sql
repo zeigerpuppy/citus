@@ -541,7 +541,7 @@ WHERE
 
 -- Local tables also planned recursively, so using it as part of the FROM clause
 -- make the clause recurring
-CREATE TABLE local_table(id int, value_1 int);
+CREATE TABLE local_table(id int, value_1 int) USING COLUMNAR;
 INSERT INTO local_table VALUES(1,1), (2,2);
 
 SELECT

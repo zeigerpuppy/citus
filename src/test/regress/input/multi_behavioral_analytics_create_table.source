@@ -9,10 +9,10 @@ SET citus.shard_count = 32;
 CREATE SCHEMA with_basics;
 SET search_path TO 'with_basics';
 
-CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint);
+CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint) USING COLUMNAR;
 SELECT create_distributed_table('users_table', 'user_id');
 
-CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint);
+CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint) USING COLUMNAR;
 SELECT create_distributed_table('events_table', 'user_id');
 
 \COPY users_table FROM '@abs_srcdir@/data/users_table.data' WITH CSV;
@@ -22,10 +22,10 @@ SET citus.shard_count = 96;
 CREATE SCHEMA subquery_and_ctes;
 SET search_path TO subquery_and_ctes;
 
-CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint);
+CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint) USING COLUMNAR;
 SELECT create_distributed_table('users_table', 'user_id');
 
-CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint);
+CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint) USING COLUMNAR;
 SELECT create_distributed_table('events_table', 'user_id');
 
 \COPY users_table FROM '@abs_srcdir@/data/users_table.data' WITH CSV;
@@ -34,32 +34,32 @@ SELECT create_distributed_table('events_table', 'user_id');
 SET citus.shard_count TO DEFAULT;
 SET search_path TO DEFAULT;
 
-CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint);
+CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint) USING COLUMNAR;
 SELECT create_distributed_table('users_table', 'user_id');
 
-CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint);
+CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint) USING COLUMNAR;
 SELECT create_distributed_table('events_table', 'user_id');
 
-CREATE TABLE agg_results (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp);
+CREATE TABLE agg_results (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp) USING COLUMNAR;
 SELECT create_distributed_table('agg_results', 'user_id');
 
 -- we need this to improve the concurrency on the regression tests
-CREATE TABLE agg_results_second (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp);
+CREATE TABLE agg_results_second (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp) USING COLUMNAR;
 SELECT create_distributed_table('agg_results_second', 'user_id');
 
 -- same as agg_results_second
-CREATE TABLE agg_results_third (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp);
+CREATE TABLE agg_results_third (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp) USING COLUMNAR;
 SELECT create_distributed_table('agg_results_third', 'user_id');
 
 -- same as agg_results_second
-CREATE TABLE agg_results_fourth (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp);
+CREATE TABLE agg_results_fourth (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp) USING COLUMNAR;
 SELECT create_distributed_table('agg_results_fourth', 'user_id');
 
 -- same as agg_results_second
-CREATE TABLE agg_results_window (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp);
+CREATE TABLE agg_results_window (user_id int, value_1_agg int, value_2_agg int, value_3_agg float, value_4_agg bigint, agg_time timestamp) USING COLUMNAR;
 SELECT create_distributed_table('agg_results_window', 'user_id');
 
-CREATE TABLE users_ref_test_table(id int, it_name varchar(25), k_no int);
+CREATE TABLE users_ref_test_table(id int, it_name varchar(25), k_no int) USING COLUMNAR;
 SELECT create_reference_table('users_ref_test_table');
 INSERT INTO users_ref_test_table VALUES(1,'User_1',45);
 INSERT INTO users_ref_test_table VALUES(2,'User_2',46);

@@ -427,7 +427,7 @@ ORDER BY time DESC LIMIT 5;
 
 SET client_min_messages TO DEFAULT;
 
-CREATE TABLE reference_table (text_col text, int_col int);
+CREATE TABLE reference_table (text_col text, int_col int) USING COLUMNAR;
 SELECT create_reference_table('reference_table');
 
 EXPLAIN (COSTS OFF) WITH cte AS (
