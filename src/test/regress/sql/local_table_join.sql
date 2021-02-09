@@ -340,6 +340,7 @@ SELECT COUNT(*) FROM distributed_table JOIN local ON distributed_table.value = '
 create table tbl (a int);
 select create_distributed_table('tbl', 'a');
 
+-- subplans work but we might skip the restrictions in them
 select 1 from (
   select 1 from (
     select 1 from
@@ -354,6 +355,19 @@ select 1 from (
     )
   ) as subq_1
 ) as subq_2;
+
+-- sublink
+SELECT COUNT(*) FROM distributed_table JOIN postgres_table using(key)
+WHERE distributed_table.key IN (SELECT key FROM distributed_table WHERE key = 5);
+
+SELECT COUNT(*) FROM distributed_table JOIN postgres_table using(key)
+WHERE distributed_table.key IN (SELECT key FROM distributed_table WHERE key = 5) AND distributed_table.key = 3;
+
+SELECT COUNT(*) FROM distributed_table_pkey JOIN postgres_table using(key)
+WHERE distributed_table_pkey.key IN (SELECT key FROM distributed_table_pkey WHERE key = 5);
+
+SELECT COUNT(*) FROM distributed_table_pkey JOIN postgres_table using(key)
+WHERE distributed_table_pkey.key IN (SELECT key FROM distributed_table_pkey WHERE key = 5) AND distributed_table_pkey.key = 3;
 
 RESET client_min_messages;
 \set VERBOSITY terse
