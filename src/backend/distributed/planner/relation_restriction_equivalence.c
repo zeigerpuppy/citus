@@ -1857,6 +1857,7 @@ GetRestrictInfoListForRelation(RangeTblEntry *rangeTblEntry,
 	{
 		return NIL;
 	}
+	return NIL;
 
 	RelOptInfo *relOptInfo = relationRestriction->relOptInfo;
 	List *joinRestrictInfo = relOptInfo->joininfo;
