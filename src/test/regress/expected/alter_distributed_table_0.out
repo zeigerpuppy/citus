@@ -132,8 +132,8 @@ SELECT STRING_AGG(table_name::text, ', ' ORDER BY 1) AS "Colocation Groups" FROM
     WHERE table_name IN ('dist_table', 'colocation_table', 'colocation_table_2') GROUP BY colocation_id ORDER BY 1;
       Colocation Groups
 ---------------------------------------------------------------------
- colocation_table, dist_table
  colocation_table_2
+ colocation_table, dist_table
 (2 rows)
 
 -- test altering shard count with cascading, note that the colocation will be kept
@@ -164,8 +164,8 @@ SELECT STRING_AGG(table_name::text, ', ' ORDER BY 1) AS "Colocation Groups" FROM
     WHERE table_name IN ('dist_table', 'colocation_table', 'colocation_table_2') GROUP BY colocation_id ORDER BY 1;
       Colocation Groups
 ---------------------------------------------------------------------
- colocation_table, dist_table
  colocation_table_2
+ colocation_table, dist_table
 (2 rows)
 
 -- test altering shard count without cascading, note that the colocation will be broken
@@ -816,5 +816,30 @@ SELECT * FROM mat_view ORDER BY a;
  2 | 2
 (2 rows)
 
+-- test long table names
+SET client_min_messages TO DEBUG1;
+CREATE TABLE abcde_0123456789012345678901234567890123456789012345678901234567890123456789 (x int, y int);
+NOTICE:  identifier "abcde_0123456789012345678901234567890123456789012345678901234567890123456789" will be truncated to "abcde_012345678901234567890123456789012345678901234567890123456"
+SELECT create_distributed_table('abcde_0123456789012345678901234567890123456789012345678901234567890123456789', 'x');
+ create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT alter_distributed_table('abcde_0123456789012345678901234567890123456789012345678901234567890123456789', distribution_column := 'y');
+NOTICE:  creating a new table for alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456
+NOTICE:  Moving the data of alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456
+DEBUG:  cannot perform distributed INSERT INTO ... SELECT because the partition columns in the source table and subquery do not match
+DETAIL:  The target table's partition column should correspond to a partition column in the subquery.
+CONTEXT:  SQL statement "INSERT INTO alter_distributed_table.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 (x,y) SELECT x,y FROM alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456"
+DEBUG:  performing repartitioned INSERT ... SELECT
+CONTEXT:  SQL statement "INSERT INTO alter_distributed_table.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 (x,y) SELECT x,y FROM alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456"
+NOTICE:  Dropping the old alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456
+CONTEXT:  SQL statement "DROP TABLE alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456 CASCADE"
+NOTICE:  Renaming the new table to alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456
+ERROR:  shard name abcde_01234567890123456789012345678901234567890_f7ff6612_361221 exceeds 63 characters
+CONTEXT:  while executing command on localhost:xxxxx
+SQL statement "ALTER TABLE alter_distributed_table.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 RENAME TO abcde_012345678901234567890123456789012345678901234567890123456"
+RESET client_min_messages;
 SET client_min_messages TO WARNING;
 DROP SCHEMA alter_distributed_table CASCADE;
