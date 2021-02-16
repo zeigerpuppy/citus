@@ -49,6 +49,7 @@
 #include "distributed/multi_logical_planner.h"
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/reference_table_utils.h"
+#include "distributed/relation_access_tracking.h"
 #include "distributed/worker_protocol.h"
 #include "distributed/worker_transaction.h"
 #include "executor/spi.h"
@@ -1570,5 +1571,78 @@ ExecuteQueryViaSPI(char *query, int SPIOK)
 	if (spiResult != SPI_OK_FINISH)
 	{
 		ereport(ERROR, (errmsg("could not finish SPI connection")));
+	}
+}
+
+
+/*
+ * SwitchToSequentialAndLocalExecutionIfRelationNameTooLong generates the longest shard name
+ * on the shards of a distributed table, and if exceeds the limit switches to sequential and
+ * local execution to prevent self-deadlocks.
+ *
+ * In case of a RENAME, the relation name parameter should store the new table name, so
+ * that the function can generate shard names of the renamed relations
+ */
+void
+SwitchToSequentialAndLocalExecutionIfRelationNameTooLong(Oid relationId,
+														 char *relationName)
+{
+	char *longestPartitionName = NULL;
+	if (!IsCitusTable(relationId))
+	{
+		return;
+	}
+
+	if (PartitionedTable(relationId))
+	{
+		longestPartitionName = LongestPartitionName(relationId);
+		if (longestPartitionName == NULL)
+		{
+			/* no partitions have been created yet */
+			return;
+		}
+	}
+
+	char *longestShardName = NULL;
+	if (longestPartitionName == NULL)
+	{
+		longestShardName = pstrdup(relationName);
+	}
+	else
+	{
+		longestShardName = pstrdup(relationName);
+	}
+
+	ShardInterval *shardInterval = LoadShardIntervalWithLongestShardName(relationId);
+	AppendShardIdToName(&longestShardName, shardInterval->shardId);
+
+	if (strlen(longestShardName) >= NAMEDATALEN - 1)
+	{
+		if (ParallelQueryExecutedInTransaction())
+		{
+			/*
+			 * If there has already been a parallel query executed, the sequential mode
+			 * would still use the already opened parallel connections to the workers,
+			 * thus contradicting our purpose of using sequential mode.
+			 */
+			ereport(ERROR, (errmsg(
+								"Shard name (%s) for table (%s) is too long and could "
+								"lead to deadlocks when executed in a transaction "
+								"block after a parallel query", longestShardName,
+								relationName),
+							errhint("Try re-running the transaction with "
+									"\"SET LOCAL citus.multi_shard_modify_mode TO "
+									"\'sequential\';\"")));
+		}
+		else
+		{
+			elog(DEBUG1, "the name of the shard (%s) for relation (%s) is too long, "
+						 "switching to sequential and local execution mode to prevent "
+						 "self deadlocks",
+				 longestShardName, relationName);
+
+			SetLocalMultiShardModifyModeToSequential();
+			SetLocalExecutionStatus(LOCAL_EXECUTION_REQUIRED);
+		}
 	}
 }

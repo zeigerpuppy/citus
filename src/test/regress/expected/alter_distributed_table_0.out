@@ -132,8 +132,8 @@ SELECT STRING_AGG(table_name::text, ', ' ORDER BY 1) AS "Colocation Groups" FROM
     WHERE table_name IN ('dist_table', 'colocation_table', 'colocation_table_2') GROUP BY colocation_id ORDER BY 1;
       Colocation Groups
 ---------------------------------------------------------------------
- colocation_table_2
  colocation_table, dist_table
+ colocation_table_2
 (2 rows)
 
 -- test altering shard count with cascading, note that the colocation will be kept
@@ -164,8 +164,8 @@ SELECT STRING_AGG(table_name::text, ', ' ORDER BY 1) AS "Colocation Groups" FROM
     WHERE table_name IN ('dist_table', 'colocation_table', 'colocation_table_2') GROUP BY colocation_id ORDER BY 1;
       Colocation Groups
 ---------------------------------------------------------------------
- colocation_table_2
  colocation_table, dist_table
+ colocation_table_2
 (2 rows)
 
 -- test altering shard count without cascading, note that the colocation will be broken
@@ -837,9 +837,9 @@ CONTEXT:  SQL statement "INSERT INTO alter_distributed_table.abcde_0123456789012
 NOTICE:  Dropping the old alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456
 CONTEXT:  SQL statement "DROP TABLE alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456 CASCADE"
 NOTICE:  Renaming the new table to alter_distributed_table.abcde_012345678901234567890123456789012345678901234567890123456
-ERROR:  shard name abcde_01234567890123456789012345678901234567890_f7ff6612_361221 exceeds 63 characters
-CONTEXT:  while executing command on localhost:xxxxx
-SQL statement "ALTER TABLE alter_distributed_table.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 RENAME TO abcde_012345678901234567890123456789012345678901234567890123456"
+ERROR:  Shard name (abcde_01234567890123456789012345678901234567890_f7ff6612_361224) for table (abcde_012345678901234567890123456789012345678901234567890123456) is too long and could lead to deadlocks when executed in a transaction block after a parallel query
+HINT:  Try re-running the transaction with "SET LOCAL citus.multi_shard_modify_mode TO 'sequential';"
+CONTEXT:  SQL statement "ALTER TABLE alter_distributed_table.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 RENAME TO abcde_012345678901234567890123456789012345678901234567890123456"
 RESET client_min_messages;
 SET client_min_messages TO WARNING;
 DROP SCHEMA alter_distributed_table CASCADE;

@@ -128,10 +128,8 @@ SELECT "Constraint", "Definition" FROM table_checks WHERE relid='public.name_len
 -- Rename the table to a too-long name
 SET client_min_messages TO DEBUG1;
 ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
-ERROR:  shard name name_len_12345678901234567890123456789012345678_fcd8ab6f_xxxxx exceeds 63 characters
-CONTEXT:  while executing command on localhost:xxxxx
+DEBUG:  the name of the shard (name_len_12345678901234567890123456789012345678_fcd8ab6f_xxxxx) for relation (name_len_12345678901234567890123456789012345678901234567890) is too long, switching to sequential and local execution mode to prevent self deadlocks
 ALTER TABLE name_len_12345678901234567890123456789012345678901234567890 RENAME TO name_lengths;
-ERROR:  relation "name_len_12345678901234567890123456789012345678901234567890" does not exist
 RESET client_min_messages;
 -- Placeholders for RENAME operations
 \set VERBOSITY TERSE

@@ -699,9 +699,10 @@ NOTICE:  Moving the data of alter_table_set_access_method.abcde_0123456789012345
 NOTICE:  Dropping the old alter_table_set_access_method.abcde_012345678901234567890123456789012345678901234567890123456
 CONTEXT:  SQL statement "DROP TABLE alter_table_set_access_method.abcde_012345678901234567890123456789012345678901234567890123456 CASCADE"
 NOTICE:  Renaming the new table to alter_table_set_access_method.abcde_012345678901234567890123456789012345678901234567890123456
-ERROR:  shard name abcde_01234567890123456789012345678901234567890_f7ff6612_360898 exceeds 63 characters
-CONTEXT:  while executing command on localhost:xxxxx
-SQL statement "ALTER TABLE alter_table_set_access_method.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 RENAME TO abcde_012345678901234567890123456789012345678901234567890123456"
+DEBUG:  the name of the shard (abcde_01234567890123456789012345678901234567890_f7ff6612_xxxxxx) for relation (abcde_012345678901234567890123456789012345678901234567890123456) is too long, switching to sequential and local execution mode to prevent self deadlocks
+CONTEXT:  SQL statement "ALTER TABLE alter_table_set_access_method.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 RENAME TO abcde_012345678901234567890123456789012345678901234567890123456"
+ERROR:  cannot switch local execution status from local execution disabled to local execution enabled since it can cause visibility problems in the current transaction
+CONTEXT:  SQL statement "ALTER TABLE alter_table_set_access_method.abcde_0123456789012345678901234567890123456_f7ff6612_4160710162 RENAME TO abcde_012345678901234567890123456789012345678901234567890123456"
 RESET client_min_messages;
 SET client_min_messages TO WARNING;
 DROP SCHEMA alter_table_set_access_method CASCADE;
