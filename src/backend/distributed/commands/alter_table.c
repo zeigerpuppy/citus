@@ -512,6 +512,10 @@ ConvertTable(TableConversionState *con)
 	bool oldEnableLocalReferenceForeignKeys = EnableLocalReferenceForeignKeys;
 	SetLocalEnableLocalReferenceForeignKeys(false);
 
+	/* Switch to sequential execution if shard names will be too long */
+	SwitchToSequentialAndLocalExecutionIfRelationNameTooLong(con->relationId,
+															 con->relationName);
+
 	if (con->conversionType == UNDISTRIBUTE_TABLE && con->cascadeViaForeignKeys &&
 		(TableReferencing(con->relationId) || TableReferenced(con->relationId)))
 	{
