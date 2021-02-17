@@ -88,6 +88,20 @@ SELECT "Constraint", "Definition" FROM table_checks WHERE relid='public.name_len
 SET client_min_messages TO DEBUG1;
 ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
 ALTER TABLE name_len_12345678901234567890123456789012345678901234567890 RENAME TO name_lengths;
+
+-- Verify that we do not support long renames after parallel queries are executed in transaction block
+BEGIN;
+ALTER TABLE name_lengths rename col1 to new_column_name;
+ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
+ROLLBACK;
+
+-- The same operation will work when sequential mode is set
+BEGIN;
+SET LOCAL citus.multi_shard_modify_mode TO 'sequential';
+ALTER TABLE name_lengths rename col1 to new_column_name;
+ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
+ROLLBACK;
+
 RESET client_min_messages;
 
 -- Placeholders for RENAME operations

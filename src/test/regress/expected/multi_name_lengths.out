@@ -130,6 +130,20 @@ SET client_min_messages TO DEBUG1;
 ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
 DEBUG:  the name of the shard (name_len_12345678901234567890123456789012345678_fcd8ab6f_xxxxx) for relation (name_len_12345678901234567890123456789012345678901234567890) is too long, switching to sequential and local execution mode to prevent self deadlocks
 ALTER TABLE name_len_12345678901234567890123456789012345678901234567890 RENAME TO name_lengths;
+-- Verify that we do not support long renames after parallel queries are executed in transaction block
+BEGIN;
+ALTER TABLE name_lengths rename col1 to new_column_name;
+ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
+ERROR:  Shard name (name_len_12345678901234567890123456789012345678_fcd8ab6f_xxxxx) for table (name_len_12345678901234567890123456789012345678901234567890) is too long and could lead to deadlocks when executed in a transaction block after a parallel query
+HINT:  Try re-running the transaction with "SET LOCAL citus.multi_shard_modify_mode TO 'sequential';"
+ROLLBACK;
+-- The same operation will work when sequential mode is set
+BEGIN;
+SET LOCAL citus.multi_shard_modify_mode TO 'sequential';
+ALTER TABLE name_lengths rename col1 to new_column_name;
+ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
+DEBUG:  the name of the shard (name_len_12345678901234567890123456789012345678_fcd8ab6f_xxxxx) for relation (name_len_12345678901234567890123456789012345678901234567890) is too long, switching to sequential and local execution mode to prevent self deadlocks
+ROLLBACK;
 RESET client_min_messages;
 -- Placeholders for RENAME operations
 \set VERBOSITY TERSE
