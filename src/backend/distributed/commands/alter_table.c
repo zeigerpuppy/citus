@@ -1591,28 +1591,19 @@ void
 SwitchToSequentialAndLocalExecutionIfRelationNameTooLong(Oid relationId,
 														 char *relationName)
 {
-	char *longestPartitionName = NULL;
 	if (!IsCitusTable(relationId))
 	{
 		return;
 	}
 
+	char *longestShardName = NULL;
 	if (PartitionedTable(relationId))
 	{
-		longestPartitionName = LongestPartitionName(relationId);
-		if (longestPartitionName == NULL)
-		{
-			/* no partitions have been created yet */
-			return;
-		}
+		/* we may not have any partitions yet, and the function will return NULL in that case */
+		longestShardName = LongestPartitionName(relationId);
 	}
 
-	char *longestShardName = NULL;
-	if (longestPartitionName == NULL)
-	{
-		longestShardName = pstrdup(relationName);
-	}
-	else
+	if (longestShardName == NULL)
 	{
 		longestShardName = pstrdup(relationName);
 	}
