@@ -47,13 +47,6 @@ SELECT minimum_value, maximum_value FROM columnar.chunk;
 SELECT * FROM test_path WHERE a = '( 1 , 2 ) , ( 3 , 4 ) , ( 5 , 6 )';
 DROP TABLE test_path;
 
--- pg_snapshot
-CREATE TABLE test_pg_snapshot (a pg_snapshot) USING columnar;
-INSERT INTO test_pg_snapshot VALUES ('10:20:10,14,15');
-SELECT minimum_value, maximum_value FROM columnar.chunk;
-SELECT * FROM test_pg_snapshot WHERE a::text = '10:20:10,14,15'::pg_snapshot::text;
-DROP TABLE test_pg_snapshot;
-
 -- txid_snapshot
 CREATE TABLE test_txid_snapshot (a txid_snapshot) USING columnar;
 INSERT INTO test_txid_snapshot VALUES ('10:20:10,14,15');
@@ -67,3 +60,18 @@ INSERT INTO test_xml VALUES ('<foo>bar</foo>'::xml);
 SELECT minimum_value, maximum_value FROM columnar.chunk;
 SELECT * FROM test_xml WHERE a::text = '<foo>bar</foo>'::xml::text;
 DROP TABLE test_xml;
+
+SHOW server_version \gset
+SELECT substring(:'server_version', '\d+')::int > 12 AS server_version_above_twelve
+\gset
+\if :server_version_above_twelve
+\else
+\q
+\endif
+
+-- pg_snapshot
+CREATE TABLE test_pg_snapshot (a pg_snapshot) USING columnar;
+INSERT INTO test_pg_snapshot VALUES ('10:20:10,14,15');
+SELECT minimum_value, maximum_value FROM columnar.chunk;
+SELECT * FROM test_pg_snapshot WHERE a::text = '10:20:10,14,15'::pg_snapshot::text;
+DROP TABLE test_pg_snapshot;
