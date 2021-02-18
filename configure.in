@@ -174,7 +174,11 @@ CITUSAC_PROG_CC_CFLAGS_OPT([-Werror=vla])  # visual studio does not support thes
 CITUSAC_PROG_CC_CFLAGS_OPT([-Werror=implicit-int])
 CITUSAC_PROG_CC_CFLAGS_OPT([-Werror=implicit-function-declaration])
 CITUSAC_PROG_CC_CFLAGS_OPT([-Werror=return-type])
-
+# Use "-fno-strict-aliasing" to get rid of "dereferencing type-punned
+# pointer will break strict-aliasing rules" warnings.
+# This is beneficial from security perspective too since otherwise we might violate
+# the assumptions made by compiler optimizations and then get undefined behavior.
+CITUSAC_PROG_CC_CFLAGS_OPT([-fno-strict-aliasing])
 #
 # --enable-coverage enables generation of code coverage metrics with gcov
 #
