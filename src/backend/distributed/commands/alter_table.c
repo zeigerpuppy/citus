@@ -50,6 +50,7 @@
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/reference_table_utils.h"
 #include "distributed/relation_access_tracking.h"
+#include "distributed/shard_utils.h"
 #include "distributed/worker_protocol.h"
 #include "distributed/worker_transaction.h"
 #include "executor/spi.h"
@@ -176,6 +177,8 @@ static TableConversionReturn * AlterDistributedTable(TableConversionParameters *
 static TableConversionReturn * AlterTableSetAccessMethod(
 	TableConversionParameters *params);
 static TableConversionReturn * ConvertTable(TableConversionState *con);
+static bool SwitchToSequentialAndLocalExecutionIfShardNameTooLong(char *relationName,
+																  char *longestShardName);
 static void EnsureTableNotReferencing(Oid relationId, char conversionType);
 static void EnsureTableNotReferenced(Oid relationId, char conversionType);
 static void EnsureTableNotForeign(Oid relationId);
@@ -512,7 +515,7 @@ ConvertTable(TableConversionState *con)
 	bool oldEnableLocalReferenceForeignKeys = EnableLocalReferenceForeignKeys;
 	SetLocalEnableLocalReferenceForeignKeys(false);
 
-	/* Switch to sequential execution if shard names will be too long */
+	/* switch to sequential execution if shard names will be too long */
 	SwitchToSequentialAndLocalExecutionIfRelationNameTooLong(con->relationId,
 															 con->relationName);
 
@@ -1596,21 +1599,45 @@ SwitchToSequentialAndLocalExecutionIfRelationNameTooLong(Oid relationId,
 		return;
 	}
 
-	char *longestShardName = NULL;
+	char *longestShardName = GetLongestShardName(relationId, relationName);
+	bool switchedToSequentialAndLocalExecution =
+		SwitchToSequentialAndLocalExecutionIfShardNameTooLong(relationName,
+															  longestShardName);
+
+	if (switchedToSequentialAndLocalExecution)
+	{
+		return;
+	}
+
 	if (PartitionedTable(relationId))
 	{
-		/* we may not have any partitions yet, and the function will return NULL in that case */
-		longestShardName = LongestPartitionName(relationId);
+		Oid longestNamePartitionId = PartitionWithLongestNameRelationId(relationId);
+		if (!OidIsValid(longestNamePartitionId))
+		{
+			/* no partitions have been created yet */
+			return;
+		}
+
+		char *longestPartitionName = get_rel_name(longestNamePartitionId);
+		char *longestPartitionShardName = GetLongestShardName(longestNamePartitionId,
+															  longestPartitionName);
+
+		SwitchToSequentialAndLocalExecutionIfShardNameTooLong(longestPartitionName,
+															  longestPartitionShardName);
 	}
+}
 
-	if (longestShardName == NULL)
-	{
-		longestShardName = pstrdup(relationName);
-	}
 
-	ShardInterval *shardInterval = LoadShardIntervalWithLongestShardName(relationId);
-	AppendShardIdToName(&longestShardName, shardInterval->shardId);
-
+/*
+ * SwitchToSequentialAndLocalExecutionIfShardNameTooLong switches to sequential and local
+ * execution if the shard name is too long.
+ *
+ * returns true if switched to sequential and local execution.
+ */
+static bool
+SwitchToSequentialAndLocalExecutionIfShardNameTooLong(char *relationName,
+													  char *longestShardName)
+{
 	if (strlen(longestShardName) >= NAMEDATALEN - 1)
 	{
 		if (ParallelQueryExecutedInTransaction())
@@ -1638,6 +1665,10 @@ SwitchToSequentialAndLocalExecutionIfRelationNameTooLong(Oid relationId,
 
 			SetLocalMultiShardModifyModeToSequential();
 			SetLocalExecutionStatus(LOCAL_EXECUTION_REQUIRED);
+
+			return true;
 		}
 	}
+
+	return false;
 }

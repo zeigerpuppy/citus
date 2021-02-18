@@ -14,5 +14,6 @@
 #include "postgres.h"
 
 extern Oid GetTableLocalShardOid(Oid citusTableOid, uint64 shardId);
+extern char * GetLongestShardName(Oid citusTableOid, char *citusTableName);
 
 #endif /* SHARD_UTILS_H */
