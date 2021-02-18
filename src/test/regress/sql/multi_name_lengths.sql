@@ -86,6 +86,7 @@ SELECT "Constraint", "Definition" FROM table_checks WHERE relid='public.name_len
 
 -- Rename the table to a too-long name
 SET client_min_messages TO DEBUG1;
+SET citus.force_max_query_parallelization TO ON;
 ALTER TABLE name_lengths RENAME TO name_len_12345678901234567890123456789012345678901234567890;
 ALTER TABLE name_len_12345678901234567890123456789012345678901234567890 RENAME TO name_lengths;
 
@@ -104,10 +105,40 @@ ROLLBACK;
 
 RESET client_min_messages;
 
--- Placeholders for RENAME operations
+-- test long partitioned table renames
+CREATE TABLE partition_lengths
+(
+    tenant_id integer NOT NULL,
+    timeperiod timestamp without time zone NOT NULL
+) PARTITION BY RANGE (timeperiod);
+
+SELECT create_distributed_table('partition_lengths', 'tenant_id');
+CREATE TABLE partition_lengths_p2020_09_28 PARTITION OF partition_lengths FOR VALUES FROM ('2020-09-28 00:00:00') TO ('2020-09-29 00:00:00');
+
+-- verify that we can rename partitioned tables and partitions to too-long names
+ALTER TABLE partition_lengths RENAME TO partition_lengths_12345678901234567890123456789012345678901234567890;
+
+-- verify that we can rename partitioned tables and partitions with too-long names
+ALTER TABLE partition_lengths_12345678901234567890123456789012345678901234567890 RENAME TO partition_lengths;
+
+-- Placeholders for unsupported operations
 \set VERBOSITY TERSE
+-- renaming distributed table constraints are not supported
 ALTER TABLE name_lengths RENAME CONSTRAINT unique_12345678901234567890123456789012345678901234567890 TO unique2_12345678901234567890123456789012345678901234567890;
 
+-- renaming distributed table partitions are not supported
+ALTER TABLE partition_lengths_p2020_09_28 RENAME TO partition_lengths_p2020_09_28_12345678901234567890123456789012345678901234567890;
+
+-- creating or attaching new partitions with long names create deadlocks
+CREATE TABLE partition_lengths_p2020_09_29_12345678901234567890123456789012345678901234567890 (LIKE partition_lengths_p2020_09_28);
+ALTER TABLE partition_lengths
+    ATTACH PARTITION partition_lengths_p2020_09_29_12345678901234567890123456789012345678901234567890
+    FOR VALUES FROM ('2020-09-29 00:00:00') TO ('2020-09-30 00:00:00');
+CREATE TABLE partition_lengths_p2020_09_30_12345678901234567890123456789012345678901234567890
+    PARTITION OF partition_lengths
+    FOR VALUES FROM ('2020-09-30 00:00:00') TO ('2020-10-01 00:00:00');
+
+DROP TABLE partition_lengths CASCADE;
 \set VERBOSITY DEFAULT
 
 -- Verify that CREATE INDEX on already distributed table has proper shard names.
@@ -234,3 +265,4 @@ DROP TABLE multi_name_lengths.too_long_12345678901234567890123456789012345678901
 -- Clean up.
 DROP TABLE name_lengths CASCADE;
 DROP TABLE U&"elephant_!0441!043B!043E!043D!0441!043B!043E!043D!0441!043B!043E!043D!0441!043B!043E!043D!0441!043B!043E!043D!0441!043B!043E!043D" UESCAPE '!' CASCADE;
+RESET citus.force_max_query_parallelization;
